@@ -112,6 +112,7 @@ td{padding:9px 10px;border-bottom:1px solid var(--border)}
 <div id="toast"></div>
 
 <script src="https://accounts.google.com/gsi/client" async defer onload="maybeInitGoogle()"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script>
 /* ============================================================
    Play Test — PHASE 2: shared cloud database for everyone
@@ -156,7 +157,9 @@ en:{
   myappsTitle:'My games',myappsSub:'Add a game and list it on the test exchange.',
   addGame:'＋ Add a new game',noGames:'No games yet. Click “Add a new game”.',
   publish:'📢 Find testers',del:'Delete',
-  shareBtn:'🔗 Invite link',copied:'Invite link copied — send it to testers! Anyone who opens it joins your test automatically.',
+  shareBtn:'🔗 Invite / QR',copied:'Invite link copied — send it to testers! Anyone who opens it joins your test automatically.',
+  qrInviteTitle:'Invite testers — {a}',qrScan:'Scan with a phone camera to join the test',
+  qrOptin:'Scan with your phone to open the game in Google Play',copyLink:'📋 Copy link',
   addTitle:'Add a game',gameTitle:'Game title',gameTitlePh:'e.g. Neon Runner',
   gameDesc:'Short description (what to test?)',gameDescPh:'e.g. 2D platformer — check levels 1–5, the shop and ads',
   optinLink:'Opt-in link from Google Play Console',
@@ -279,7 +282,9 @@ pl:{
   myappsTitle:'Moje gry',myappsSub:'Dodaj grę i wystaw ją na giełdę wymiany testów.',
   addGame:'＋ Dodaj nową grę',noGames:'Brak gier. Kliknij „Dodaj nową grę".',
   publish:'📢 Szukam testerów',del:'Usuń',
-  shareBtn:'🔗 Link zaproszenia',copied:'Link skopiowany — wyślij testerom! Kto go otworzy, automatycznie dołącza do Twojego testu.',
+  shareBtn:'🔗 Zaproś / QR',copied:'Link skopiowany — wyślij testerom! Kto go otworzy, automatycznie dołącza do Twojego testu.',
+  qrInviteTitle:'Zaproś testerów — {a}',qrScan:'Zeskanuj aparatem telefonu, aby dołączyć do testu',
+  qrOptin:'Zeskanuj telefonem, aby otworzyć grę w Google Play',copyLink:'📋 Kopiuj link',
   addTitle:'Dodaj grę',gameTitle:'Tytuł gry',gameTitlePh:'np. Neon Runner',
   gameDesc:'Krótki opis (co testować?)',gameDescPh:'np. platformówka 2D — sprawdź poziomy 1–5, sklep i reklamy',
   optinLink:'Link opt-in z Google Play Console',
@@ -654,7 +659,7 @@ function myAppsView(){
       <div class="muted">${esc(a.desc||'')}</div>
       <div class="muted" style="word-break:break-all">🔗 ${esc(a.link)}</div></div></div>
       <div class="row">
-        ${a.status==='draft'?`<button class="btn small" onclick="publishApp('${a.id}')">${t('publish')}</button>`:`<button class="btn small sec" onclick="copyInvite('${a.id}')">${t('shareBtn')}</button>`}
+        ${a.status==='draft'?`<button class="btn small" onclick="publishApp('${a.id}')">${t('publish')}</button>`:`<button class="btn small sec" onclick="openInvite('${a.id}')">${t('shareBtn')}</button>`}
         <button class="btn small sec" onclick="deleteApp('${a.id}')">${t('del')}</button>
       </div>
     </div>`).join(''):'<div class="card muted">'+t('noGames')+'</div>'}`;
@@ -662,6 +667,33 @@ function myAppsView(){
 function copyInvite(appId){
   const link=SITE+'/#join='+appId;
   (navigator.clipboard?navigator.clipboard.writeText(link):Promise.reject()).then(()=>toast(t('copied'))).catch(()=>{prompt('Link:',link);});
+}
+/* QR code rendered locally (no external service — the link never leaves the app) */
+function qrBlock(text){
+  if(typeof qrcode==='undefined')return '';
+  try{
+    const q=qrcode(0,'M');q.addData(text);q.make();
+    const svg=q.createSvgTag({cellSize:4,margin:0,scalable:true}).replace('<svg ','<svg style="width:190px;height:190px;display:block" ');
+    return '<div style="background:#fff;padding:14px;border-radius:14px;display:inline-block">'+svg+'</div>';
+  }catch(e){return '';}
+}
+function openInvite(appId){
+  const a=appById(appId);const link=SITE+'/#join='+appId;
+  modal(`<h2 style="margin-top:0">${t('qrInviteTitle',{a:esc(a.title)})}</h2>
+  <div style="text-align:center;margin:14px 0">${qrBlock(link)}<div class="muted" style="margin-top:8px">${t('qrScan')}</div></div>
+  <div class="card" style="word-break:break-all;font-size:13px;margin:10px 0">${esc(link)}</div>
+  <div class="row" style="margin-top:14px">
+    <button class="btn" onclick="copyInvite('${appId}')">${t('copyLink')}</button>
+    ${navigator.share?`<button class="btn sec" onclick="nativeShare('${appId}')">📤</button>`:''}
+    <button class="btn sec" onclick="closeModal()">${t('cancel')}</button>
+  </div>`);
+}
+function nativeShare(appId){const a=appById(appId);navigator.share({title:'Play Test — '+a.title,url:SITE+'/#join='+appId}).catch(()=>{});}
+function showQr(title,link,caption){
+  modal(`<h2 style="margin-top:0">${esc(title)}</h2>
+  <div style="text-align:center;margin:14px 0">${qrBlock(link)}<div class="muted" style="margin-top:8px">${caption}</div></div>
+  <div class="card" style="word-break:break-all;font-size:13px;margin:10px 0">${esc(link)}</div>
+  <button class="btn sec" onclick="closeModal()">OK</button>`);
 }
 function openAddApp(){
   modal(`<h2 style="margin-top:0">${t('addTitle')}</h2>
@@ -719,6 +751,7 @@ async function acceptChallenge(appId,auto){
     ${dev.isAndroid&&dev.version?`<div class="alert green">${t('androidOk',{v:dev.version})}</div>`:''}
     <p style="margin:10px 0">${t('optinFor',{a:esc(a.title)})}</p>
     <a class="btn" style="display:block;text-align:center;text-decoration:none;margin:12px 0" href="${esc(a.link)}" target="_blank" rel="noopener">${t('openPlay')}</a>
+    <div style="text-align:center;margin:12px 0">${qrBlock(a.link)}<div class="muted" style="margin-top:6px">${t('qrOptin')}</div></div>
     <div class="card" style="word-break:break-all;margin:12px 0;font-size:13px">${esc(a.link)}</div>
     <ol style="margin:12px 0 12px 20px;line-height:1.7;font-size:14px">${t('steps')}</ol>
     <div class="alert amber">${t('warn14')}</div>
@@ -749,7 +782,7 @@ function myTestsView(){
     </div></div>
     ${!m.started?`<a class="btn sec" style="display:inline-block;text-decoration:none;margin-top:8px" href="${esc(a.link)}" target="_blank" rel="noopener">${t('openPlay')}</a>`:''}
     ${m.started?`<div class="progress"><div style="width:${Math.min(100,s/REQUIRED_DAYS*100)}%"></div></div>
-    <div class="muted">${t('optinLinkLbl')}: <span style="word-break:break-all">${esc(a.link)}</span></div>
+    <div class="muted">${t('optinLinkLbl')}: <span style="word-break:break-all">${esc(a.link)}</span> <button class="btn small sec" onclick="showQr('${esc(a.title)}','${esc(a.link)}',t('qrOptin'))">📱 QR</button></div>
     ${s>=7&&!m.surveys.d7&&m.status==='active'?`<div class="alert amber" style="margin-top:10px">${t('d7due',{id:m.id})}</div>`:''}
     ${s>=REQUIRED_DAYS&&!m.surveys.d14&&m.status==='active'?`<div class="alert green" style="margin-top:10px">${t('d14due',{id:m.id})}</div>`:''}
     `:''}
