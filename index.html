@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PlayTest Connect — Google Play Closed Testing Exchange</title>
+<style>
+:root{
+  --bg:#0F1117; --card:#1A1D27; --card2:#222636; --border:#2A2F42;
+  --text:#E5E9F0; --muted:#8B93A7; --accent:#22C55E; --accent-dim:#16803C;
+  --danger:#EF4444; --warn:#F59E0B; --info:#3B82F6; --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Inter,system-ui,sans-serif;font-size:15px;min-height:100vh}
+a{color:var(--accent)}
+#layout{display:flex;min-height:100vh}
+/* SIDEBAR */
+#sidebar{width:240px;background:var(--card);border-right:1px solid var(--border);padding:20px 12px;position:fixed;top:0;bottom:0;left:0;display:flex;flex-direction:column;gap:4px;z-index:10}
+#sidebar .logo{font-size:18px;font-weight:700;padding:6px 12px 18px;display:flex;align-items:center;gap:8px}
+#sidebar .logo span{color:var(--accent)}
+.navbtn{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;color:var(--muted);cursor:pointer;border:none;background:none;font-size:14.5px;width:100%;text-align:left;transition:background .15s ease-out,color .15s ease-out}
+.navbtn:hover{background:var(--card2);color:var(--text)}
+.navbtn.active{background:rgba(34,197,94,.12);color:var(--accent);font-weight:600}
+#sidebar .bottom{margin-top:auto;font-size:12px;color:var(--muted);padding:12px}
+.langsw{display:flex;gap:6px;padding:8px 12px}
+.langsw button{background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer}
+.langsw button.on{color:var(--accent);border-color:var(--accent);font-weight:700}
+/* MAIN */
+#main{margin-left:240px;flex:1;padding:28px 32px;max-width:1200px}
+h1{font-size:22px;font-weight:700;margin-bottom:4px}
+h2{font-size:17px;font-weight:600;margin:22px 0 12px}
+.sub{color:var(--muted);margin-bottom:22px;font-size:14px}
+/* CARDS */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;animation:fadeIn .2s ease-out}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.grid{display:grid;gap:16px}
+.grid.c2{grid-template-columns:1fr 1fr}
+.grid.c3{grid-template-columns:1fr 1fr 1fr}
+@media(max-width:900px){.grid.c2,.grid.c3{grid-template-columns:1fr}#main{padding:20px 14px}}
+/* MOBILE (Android phones): bottom navigation bar + touch-friendly targets */
+@media(max-width:768px){
+  #sidebar{top:auto;bottom:0;left:0;right:0;width:100%;height:auto;flex-direction:row;padding:6px 4px calc(6px + env(safe-area-inset-bottom));border-right:none;border-top:1px solid var(--border);justify-content:space-around;align-items:stretch;gap:0}
+  #sidebar .logo,#sidebar .bottom,#sidebar .langsw{display:none}
+  .navbtn{flex-direction:column;gap:2px;padding:7px 2px;width:auto;flex:1;align-items:center;text-align:center;min-height:52px;justify-content:center}
+  .navbtn>span:first-child{font-size:19px}
+  .navbtn .lbl{font-size:9.5px;line-height:1.1}
+  #main{margin-left:0;margin-bottom:84px;padding:16px 12px}
+  input,textarea,select{font-size:16px;min-height:44px}
+  textarea{min-height:70px}
+  .btn{min-height:44px}
+  #modalBox{max-width:100%;padding:20px 16px}
+  h1{font-size:19px}
+  .stat{font-size:24px}
+}
+/* ELEMENTS */
+.btn{background:var(--accent);color:#06210f;border:none;padding:10px 18px;border-radius:10px;font-weight:600;font-size:14px;cursor:pointer;transition:filter .15s}
+.btn:hover{filter:brightness(1.12)}
+.btn.sec{background:var(--card2);color:var(--text);border:1px solid var(--border)}
+.btn.danger{background:var(--danger);color:#fff}
+.btn.small{padding:6px 12px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+input,textarea,select{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 12px;font-size:14px;width:100%;font-family:inherit}
+input:focus,textarea:focus{outline:1px solid var(--accent)}
+label{display:block;font-size:13px;color:var(--muted);margin:12px 0 5px;font-weight:600}
+.badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600}
+.badge.green{background:rgba(34,197,94,.15);color:var(--accent)}
+.badge.blue{background:rgba(59,130,246,.15);color:var(--info)}
+.badge.amber{background:rgba(245,158,11,.15);color:var(--warn)}
+.badge.red{background:rgba(239,68,68,.15);color:var(--danger)}
+.badge.gray{background:var(--card2);color:var(--muted)}
+.progress{height:8px;background:var(--card2);border-radius:99px;overflow:hidden;margin:6px 0}
+.progress>div{height:100%;background:var(--accent);border-radius:99px;transition:width .4s ease-out}
+.stat{font-size:30px;font-weight:700}
+.stat small{font-size:14px;color:var(--muted);font-weight:400}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--border)}
+td{padding:9px 10px;border-bottom:1px solid var(--border)}
+.alert{padding:12px 16px;border-radius:10px;font-size:13.5px;margin-bottom:10px;border:1px solid}
+.alert.red{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.3);color:#FCA5A5}
+.alert.amber{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.3);color:#FCD34D}
+.alert.green{background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.3);color:#86EFAC}
+.muted{color:var(--muted);font-size:13px}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.spread{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+/* MODAL */
+#modalWrap{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+#modalWrap.open{display:flex}
+#modalBox{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:26px;width:100%;max-width:520px;max-height:90vh;overflow:auto;animation:fadeIn .18s ease-out}
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:24px;background:var(--card2);border:1px solid var(--accent);color:var(--text);padding:13px 20px;border-radius:12px;font-size:14px;display:none;z-index:60;max-width:340px}
+/* BANNER 100 */
+.founderBanner{background:linear-gradient(90deg,rgba(34,197,94,.18),rgba(59,130,246,.12));border:1px solid rgba(34,197,94,.4);border-radius:var(--radius);padding:16px 20px;margin-bottom:20px;font-size:15px}
+.founderBanner b{color:var(--accent);font-size:18px}
+/* REGISTER */
+#registerView{max-width:520px;margin:40px auto;padding:0 16px}
+.ring{width:120px;height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;margin:0 auto}
+.bar-chart{display:flex;align-items:flex-end;gap:4px;height:90px;margin-top:10px}
+.bar-chart>div{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;position:relative}
+.bar-chart>div span{position:absolute;bottom:-18px;left:0;right:0;text-align:center;font-size:10px;color:var(--muted)}
+.appicon{width:44px;height:44px;border-radius:10px;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="modalWrap"><div id="modalBox"></div></div>
+<div id="toast"></div>
+
+<script src="https://accounts.google.com/gsi/client" async defer onload="maybeInitGoogle()"></script>
+<script>
+/* ============================================================
+   PlayTest Connect — MVP (local / offline-first mode)
+   Data: localStorage + JSON export/import (sync via OneDrive)
+   Phase 2: swap the store layer for Supabase (supabase-schema.sql)
+   Language: English (default) + Polish, switchable
+   ============================================================ */
+const LS_KEY='ptc_state_v1';
+const FREE_LIMIT=100, GOOGLE_MIN_TESTERS=12, TARGET_TESTERS=14, REQUIRED_DAYS=14;
+/* Master admin — the platform owner's account (full admin access, no PIN) */
+const MASTER_ADMIN_EMAIL='kawalko334411@gmail.com';
+/* Google OAuth Client ID (Google Cloud Console → Google Auth Platform → Clients).
+   Can be overridden in ⚙️ Settings. */
+const DEFAULT_GOOGLE_CLIENT_ID='832482048394-0be28ltmam33msagi9srk0hmrs0juctq.apps.googleusercontent.com';
+
+/* ---------- I18N — English default, Polish secondary ---------- */
+const T={
+en:{
+  tagline:'Google Play closed-testing exchange — 14 testers × 14 days, stress-free.',
+  founderLeft:'🎉 <b>{n} of {max}</b> free Founder accounts left!',
+  founderGone:'Limit reached — $3.99/mo from now on (payments coming soon)',
+  registered:'🎉 Registered: <b>{n}</b> · <b>{left} of {max}</b> free Founder accounts left',
+  signTitle:'Create an account or sign in',
+  orEmail:'— or with e-mail —',
+  googleOff:'🔑 Google sign-in inactive — paste an OAuth Client ID in ⚙️ Settings or in the <code>DEFAULT_GOOGLE_CLIENT_ID</code> constant.',
+  nick:'Nickname (publicly visible)',nickPh:'e.g. IndieDevBerlin',
+  email:'E-mail (Google — 1 account = 1 user)',
+  declDevice:'I declare that I test on a <b>physical Android device</b> (not an emulator).',
+  declTerms:'I accept the terms. I understand the platform <b>forbids</b> soliciting Play Store ratings/reviews — we only exchange honest testing and feedback.',
+  registerBtn:'Sign up',registerFree:'— free (Founder)',
+  accountNo:'Account #{n} · After the first {max} accounts: $3.99/mo, cancel anytime.',
+  nav_dashboard:'🏠 Dashboard',nav_myapps:'🎮 My games',nav_exchange:'🔄 Test exchange',nav_mytests:'✅ My tests',nav_reputation:'⭐ Reputation',nav_admin:'🔐 Admin',nav_settings:'⚙️ Settings',
+  signedAs:'Signed in as',localMode:'Local mode (MVP)',
+  dashTitle:'Dashboard',hello:'Hello, {n}!',founderBadge:'⭐ Founder',
+  statMyApps:'My games in testing',statTesting:'Games I test',statPoints:'My Tester Points',
+  todayTitle:'To test today ({n})',todayEmpty:'Nothing to do — all of today’s check-ins are done. 💪',
+  dayOf:'Day {d} of {max}',by:'by',checkinBtn:'✅ Daily check-in',
+  progressTitle:'My games’ progress',progressEmpty:'You have no game in testing yet. Add one under 🎮 My games.',
+  alertReset:'⚠️ Tester <b>{t}</b> of “{a}” has not confirmed activity for {n} days — <b>their streak was reset</b>. The 14 days must be continuous!',
+  alertToday:'⏳ Tester <b>{t}</b> (“{a}”) hasn’t done today’s check-in yet.',
+  searching:'Looking for testers',inTest:'In testing',draft:'Draft',
+  testers:' / {n} testers',recommend:'Target: {n} testers — Google requires {min}; the buffer protects you if someone drops out. Testers with a full 14-day streak: ',
+  streakZero:'streak reset',dayXof:'day {d}/{max}',full14:'✔ 14/14 days',
+  myappsTitle:'My games',myappsSub:'Add a game and list it on the test exchange.',
+  addGame:'＋ Add a new game',noGames:'No games yet. Click “Add a new game”.',
+  publish:'📢 Find testers',del:'Delete',
+  addTitle:'Add a game',gameTitle:'Game title',gameTitlePh:'e.g. Neon Runner',
+  gameDesc:'Short description (what to test?)',gameDescPh:'e.g. 2D platformer — check levels 1–5, the shop and ads',
+  optinLink:'Opt-in link from Google Play Console',
+  optinHint:'Find the link in Play Console → Closed testing → “Copy link”.',
+  save:'Save game',cancel:'Cancel',
+  vTitle:'Enter a game title.',vLink:'The link must match https://play.google.com/apps/testing/... (opt-in link from Play Console).',
+  savedDraft:'Game saved as draft.',published:'📢 Game listed on the test exchange!',
+  cantDelete:'Cannot delete — the game has active testers.',
+  exTitle:'Test exchange',exSub:'Accept a challenge — test someone’s game, earn Tester Points and build reputation. Authors return the favour by testing your game.',
+  exEmpty:'No games available on the exchange. Check back later or load sample data in ⚙️ Settings.',
+  accept:'🎯 Accept test challenge',author:'author',trust:'Trust',
+  acceptedTitle:'🎯 Challenge accepted!',optinFor:'Here is the opt-in link for <b>{a}</b>:',
+  steps:'<li>Open the link on a <b>physical Android phone</b> and join the test.</li><li>Download the game from the Play Store and <b>launch it</b>.</li><li>Come back here (✅ My tests) and click “Downloaded &amp; launched” — your 14-day timer starts.</li>',
+  warn14:'⚠️ Remember: the 14 days must be <b>continuous</b>. A daily check-in = 1 click + 1 sentence. A 2-day gap resets the timer!',
+  goMyTests:'Go to My tests',
+  mtTitle:'My tests',mtSub:'Games you test for other developers. A daily check-in keeps your streak alive.',
+  mtEmpty:'You are not testing any game yet. Visit the 🔄 Test exchange.',
+  stDone:'✔ Completed (14/14)',stAbandoned:'Abandoned',stWaiting:'Waiting to start',
+  startBtn:'📲 Downloaded & launched',doneToday:'✔ done today',
+  d7due:'📋 Time for the mid-test survey (day 7) — <a href="#" onclick="openSurvey(\'{id}\',\'d7\');return false">fill it in (2 min)</a>',
+  d14due:'🏁 14 days completed! <a href="#" onclick="openSurvey(\'{id}\',\'d14\');return false">Fill in the final survey</a> to close the test and collect +50 pts.',
+  startTitle:'📲 Confirm start',
+  startInfo:'To prove the test is genuine (Google’s quality requirement), add a <b>screenshot of the game running</b> on your phone.',
+  shotLabel:'Screenshot from the game (day 1)',firstNote:'Short first observation',
+  firstNotePh:'e.g. installs fine, menu is clear, game runs smoothly',
+  startTimer:'Start the 14-day timer',
+  vShot:'A screenshot is required (proof of testing on a physical device).',
+  vNote:'Write at least one sentence (min. 10 characters).',
+  started:'🚀 The 14-day timer has started! Come back daily for your check-in.',
+  ciTitle:'✅ Check-in — {a}',
+  ciInfo:'Day {d} of {max}. Write at least one sentence: what did you test / notice today?',
+  ciPh:'e.g. level 3 — the pause button does not respond on second press',
+  ciBtn:'Complete the day (+10 pts)',
+  ciDup:'Today’s check-in is already done (max 1 per day).',
+  ciShort:'Write at least 10 characters — this feedback goes to the developer and into their answers for Google.',
+  ciOk:'✅ Day {d}/{max} completed. +10 pts',ci14:'🎉 14/14 days! Fill in the final survey under My tests.',
+  svTitleD7:'📋 Mid-test survey (day 7) — {a}',svTitleD14:'📋 Final survey (day 14) — {a}',
+  svInfo:'The developer pastes this feedback into their Play Console answers — be specific.',
+  q1:'1. What works well?',q2:'2. What doesn’t work / which bugs did you find?',q3:'3. What would you improve first?',
+  svSend:'Submit survey',svLater:'Later',
+  svShort:'Answers are too short — the developer needs specifics for Google.',
+  svDone:'🏆 Test completed! +50 pts. Your Trust Score grows.',svSaved:'Thank you! Survey saved.',
+  repTitle:'Reputation',repSub:'Your credibility as a tester — game authors see it on the exchange.',
+  trustScore:'Trust Score',
+  trustHigh:'✅ Trusted tester — priority in matching',trustMid:'🟡 Build your streak — finish full 14-day cycles',trustLow:'🔴 Low credibility — don’t abandon tests',
+  repPoints:'Tester Points',repCycles:'Completed 14-day cycles',repActive:'Active tests',repBadges:'Badges',
+  bFinisher:'🏆 Finisher',bPro:'💎 Pro Tester',
+  howTrust:'How does the Trust Score grow?',
+  howTrustList:'<li>+12 for every completed full 14-day cycle</li><li>+1 for each day of your current check-in streak</li><li>+4 for every filled survey (day 7/14)</li><li><span style="color:var(--danger)">−15 for an abandoned test</span> (gap with no return)</li>',
+  admTitle:'🔐 Admin panel',admFirst:'First run — set the owner PIN.',
+  newPin:'New PIN (4–8 digits)',setPin:'Set PIN',admOnly:'Owner access only.',pin:'PIN',unlock:'Unlock',
+  vPin:'PIN: 4–8 digits.',pinSet:'PIN set.',pinBad:'Wrong PIN.',
+  admSub:'Registrations control and the “First 100” model.',
+  admTotal:'Total registered',admFree:'Free Founder slots',admSubs:'Future subscribers ($3.99/mo)',
+  admChart:'Registration growth (recent days)',admList:'Accounts ({n})',
+  colNo:'#',colNick:'Nickname',colEmail:'E-mail',colDate:'Date',colStatus:'Status',colTrust:'Trust',
+  stFounder:'Founder',stPaid:'$3.99/mo',
+  admPay:'💳 Payment integration is intentionally <b>disabled</b> in the MVP — accounts 101+ only see an informational subscription screen. The gateway (Stripe) comes in phase 2 on your command.',
+  setTitle:'Settings',setSub:'Data, sync and developer tools.',
+  langTitle:'🌐 Language',
+  dbTitle:'💾 Database (local mode)',
+  dbInfo:'Data is stored locally. Export the JSON file to your OneDrive/Google Drive folder for backup and manual sync between computers. Phase 2: shared backend (Supabase) — schema ready in <code>supabase-schema.sql</code>.',
+  exportBtn:'⬇ Export database (JSON)',importBtn:'⬆ Import database',
+  gTitle:'🔑 Google sign-in',
+  gInfo:'Paste an OAuth Client ID (Google Cloud Console → Google Auth Platform → Clients → web application). “Authorized JavaScript origins” must include the address you open the app from (e.g. <code>http://localhost:8377</code>). Note: Google sign-in does not work from <code>file://</code> — only http/https.',
+  gSaveBtn:'Save Client ID',
+  gSaved:'Client ID saved — the Google button is active on the sign-in screen.',gRemoved:'Client ID removed.',
+  gBad:'The Client ID should end with .apps.googleusercontent.com',
+  demoTitle:'🧪 Sample data',
+  demoInfo:'Load sample developers and games to see the exchange, dashboard and admin in action.',
+  demoBtn:'Load sample data',demoLoaded:'🧪 Sample data loaded ({n} developers, games on the exchange).',
+  dangerTitle:'⚠️ Danger zone',resetBtn:'Reset the whole app',resetConfirm:'Are you sure? This deletes ALL local data.',
+  logout:'Sign out',
+  footer:'PlayTest Connect v0.1 MVP · Terms: this platform is for honest test exchange only. Forbidden: emulators, bots, account farms and soliciting Play Store ratings/reviews. Violation = ban and loss of points.',
+  exported:'Database exported — save the file in your OneDrive folder.',
+  imported:'Database imported.',importBad:'Invalid database file.',
+  vNick:'The nickname needs at least 3 characters.',vEmail:'Enter a valid e-mail address.',
+  vBoth:'Tick both declarations.',
+  welcomeBack:'👋 Welcome back, {n}!',
+  welcomeFounder:'🎉 Welcome, Founder! Your account is free forever.',created:'Account created.',
+  gReadErr:'Could not read your Google data.',gNoMail:'Google account without a verified e-mail.',
+  finishTitle:'Finish signing up',createAcc:'Create account',
+  optinLinkLbl:'Opt-in link'
+},
+pl:{
+  tagline:'Wymiana testów zamkniętych Google Play — 14 testerów × 14 dni, bez stresu.',
+  founderLeft:'🎉 Zostało <b>{n} ze {max}</b> darmowych kont Założyciela!',
+  founderGone:'Limit wyczerpany — od teraz 3,99 USD/mies. (płatności wkrótce)',
+  registered:'🎉 Zarejestrowanych: <b>{n}</b> · Zostało <b>{left} ze {max}</b> darmowych kont Założyciela',
+  signTitle:'Załóż konto lub zaloguj się',
+  orEmail:'— albo przez e-mail —',
+  googleOff:'🔑 Logowanie Google nieaktywne — wklej OAuth Client ID w ⚙️ Ustawieniach lub w stałej <code>DEFAULT_GOOGLE_CLIENT_ID</code>.',
+  nick:'Nick (widoczny publicznie)',nickPh:'np. IndieDevKrakow',
+  email:'E-mail (Google — 1 konto = 1 użytkownik)',
+  declDevice:'Oświadczam, że testuję na <b>fizycznym urządzeniu Android</b> (nie na emulatorze).',
+  declTerms:'Akceptuję regulamin. Rozumiem, że platforma <b>zakazuje</b> wymuszania ocen/recenzji w Sklepie Play — wymieniamy się wyłącznie uczciwym testowaniem i feedbackiem.',
+  registerBtn:'Zarejestruj się',registerFree:'— za darmo (Założyciel)',
+  accountNo:'Konto #{n} · Po {max} pierwszych kontach: 3,99 USD/mies., rezygnacja w każdej chwili.',
+  nav_dashboard:'🏠 Panel',nav_myapps:'🎮 Moje gry',nav_exchange:'🔄 Giełda testów',nav_mytests:'✅ Moje testy',nav_reputation:'⭐ Reputacja',nav_admin:'🔐 Admin',nav_settings:'⚙️ Ustawienia',
+  signedAs:'Zalogowany',localMode:'Tryb lokalny (MVP)',
+  dashTitle:'Panel główny',hello:'Dzień dobry, {n}!',founderBadge:'⭐ Założyciel',
+  statMyApps:'Moje gry w testach',statTesting:'Gry, które testuję',statPoints:'Moje Punkty Testera',
+  todayTitle:'Do przetestowania dzisiaj ({n})',todayEmpty:'Nic do zrobienia — wszystkie dzisiejsze check-iny zaliczone. 💪',
+  dayOf:'Dzień {d} z {max}',by:'autor:',checkinBtn:'✅ Check-in dnia',
+  progressTitle:'Postęp moich gier',progressEmpty:'Nie masz jeszcze gry w testach. Dodaj ją w sekcji 🎮 Moje gry.',
+  alertReset:'⚠️ Tester <b>{t}</b> gry „{a}" nie potwierdził aktywności od {n} dni — <b>seria została wyzerowana</b>. 14 dni musi być ciągłe!',
+  alertToday:'⏳ Tester <b>{t}</b> („{a}") nie zrobił jeszcze dzisiejszego check-inu.',
+  searching:'Szuka testerów',inTest:'W teście',draft:'Szkic',
+  testers:' / {n} testerów',recommend:'Cel: {n} testerów — Google wymaga {min}; bufor chroni Cię, gdyby ktoś się wykruszył. Testerzy z pełną serią 14 dni: ',
+  streakZero:'seria zerowana',dayXof:'dzień {d}/{max}',full14:'✔ 14/14 dni',
+  myappsTitle:'Moje gry',myappsSub:'Dodaj grę i wystaw ją na giełdę wymiany testów.',
+  addGame:'＋ Dodaj nową grę',noGames:'Brak gier. Kliknij „Dodaj nową grę".',
+  publish:'📢 Szukam testerów',del:'Usuń',
+  addTitle:'Dodaj grę',gameTitle:'Tytuł gry',gameTitlePh:'np. Neon Runner',
+  gameDesc:'Krótki opis (co testować?)',gameDescPh:'np. platformówka 2D — sprawdź poziomy 1–5, sklep i reklamy',
+  optinLink:'Link opt-in z Google Play Console',
+  optinHint:'Link znajdziesz w Play Console → Testy zamknięte → „Skopiuj link".',
+  save:'Zapisz grę',cancel:'Anuluj',
+  vTitle:'Podaj tytuł gry.',vLink:'Link musi mieć format https://play.google.com/apps/testing/... (link opt-in z Play Console).',
+  savedDraft:'Gra zapisana jako szkic.',published:'📢 Gra wystawiona na giełdę testów!',
+  cantDelete:'Nie można usunąć — gra ma aktywnych testerów.',
+  exTitle:'Giełda testów',exSub:'Przyjmij wyzwanie — testuj cudzą grę, zdobywaj Punkty Testera i buduj reputację. Autorzy odwdzięczają się testem Twojej gry.',
+  exEmpty:'Brak dostępnych gier na giełdzie. Zajrzyj później lub wczytaj dane przykładowe w ⚙️ Ustawieniach.',
+  accept:'🎯 Przyjmij wyzwanie testowe',author:'autor:',trust:'Trust',
+  acceptedTitle:'🎯 Wyzwanie przyjęte!',optinFor:'Oto link opt-in do gry <b>{a}</b>:',
+  steps:'<li>Otwórz link na <b>fizycznym telefonie Android</b> i dołącz do testu.</li><li>Pobierz grę ze Sklepu Play i <b>uruchom ją</b>.</li><li>Wróć tutaj (✅ Moje testy) i kliknij „Pobrałem i uruchomiłem" — wystartuje Twój licznik 14 dni.</li>',
+  warn14:'⚠️ Pamiętaj: 14 dni musi być <b>ciągłe</b>. Codzienny check-in = 1 klik + 1 zdanie. Przerwa 2 dni zeruje licznik!',
+  goMyTests:'Przejdź do Moich testów',
+  mtTitle:'Moje testy',mtSub:'Gry, które testujesz dla innych deweloperów. Codzienny check-in utrzymuje ciągłość serii.',
+  mtEmpty:'Nie testujesz jeszcze żadnej gry. Wejdź na 🔄 Giełdę testów.',
+  stDone:'✔ Ukończony (14/14)',stAbandoned:'Porzucony',stWaiting:'Oczekuje na start',
+  startBtn:'📲 Pobrałem i uruchomiłem',doneToday:'✔ dziś zaliczone',
+  d7due:'📋 Czas na ankietę połówkową (dzień 7) — <a href="#" onclick="openSurvey(\'{id}\',\'d7\');return false">wypełnij (2 min)</a>',
+  d14due:'🏁 14 dni zaliczone! <a href="#" onclick="openSurvey(\'{id}\',\'d14\');return false">Wypełnij ankietę końcową</a>, aby zamknąć test i odebrać +50 pkt.',
+  startTitle:'📲 Potwierdzenie startu',
+  startInfo:'Aby udowodnić autentyczność testu (wymóg jakości Google), dodaj <b>zrzut ekranu z uruchomionej gry</b> na Twoim telefonie.',
+  shotLabel:'Zrzut ekranu z gry (dzień 1)',firstNote:'Krótka pierwsza obserwacja',
+  firstNotePh:'np. instaluje się OK, menu czytelne, gra działa płynnie',
+  startTimer:'Startuj licznik 14 dni',
+  vShot:'Zrzut ekranu jest wymagany (dowód testu na fizycznym urządzeniu).',
+  vNote:'Napisz min. 1 zdanie obserwacji (min. 10 znaków).',
+  started:'🚀 Licznik 14 dni wystartował! Wracaj codziennie na check-in.',
+  ciTitle:'✅ Check-in — {a}',
+  ciInfo:'Dzień {d} z {max}. Napisz min. 1 zdanie: co dziś sprawdziłeś / co zauważyłeś?',
+  ciPh:'np. poziom 3 — przycisk pauzy nie reaguje przy drugim wciśnięciu',
+  ciBtn:'Zalicz dzień (+10 pkt)',
+  ciDup:'Dzisiejszy check-in już zaliczony (max 1 dziennie).',
+  ciShort:'Napisz min. 10 znaków — ten feedback trafia do dewelopera i do odpowiedzi dla Google.',
+  ciOk:'✅ Dzień {d}/{max} zaliczony. +10 pkt',ci14:'🎉 14/14 dni! Wypełnij ankietę końcową w Moich testach.',
+  svTitleD7:'📋 Ankieta połówkowa (dzień 7) — {a}',svTitleD14:'📋 Ankieta końcowa (dzień 14) — {a}',
+  svInfo:'Ten feedback deweloper wklei do odpowiedzi w Play Console — pisz konkretnie.',
+  q1:'1. Co działa dobrze?',q2:'2. Co nie działa / jakie błędy znalazłeś?',q3:'3. Co byś poprawił w pierwszej kolejności?',
+  svSend:'Wyślij ankietę',svLater:'Później',
+  svShort:'Odpowiedzi są zbyt krótkie — deweloper potrzebuje konkretów dla Google.',
+  svDone:'🏆 Test ukończony! +50 pkt. Trust Score rośnie.',svSaved:'Dziękujemy! Ankieta zapisana.',
+  repTitle:'Reputacja',repSub:'Twoja wiarygodność jako testera — widzą ją autorzy gier na giełdzie.',
+  trustScore:'Trust Score',
+  trustHigh:'✅ Zaufany tester — priorytet w matchowaniu',trustMid:'🟡 Buduj serię — ukończ pełne cykle 14 dni',trustLow:'🔴 Niska wiarygodność — nie porzucaj testów',
+  repPoints:'Punkty Testera',repCycles:'Ukończone cykle 14-dniowe',repActive:'Aktywne testy',repBadges:'Odznaki',
+  bFinisher:'🏆 Finisher',bPro:'💎 Pro Tester',
+  howTrust:'Jak rośnie Trust Score?',
+  howTrustList:'<li>+12 za każdy ukończony pełny cykl 14 dni</li><li>+1 za każdy dzień bieżącej serii check-inów</li><li>+4 za każdą wypełnioną ankietę (dzień 7/14)</li><li><span style="color:var(--danger)">−15 za porzucony test</span> (przerwa i brak powrotu)</li>',
+  admTitle:'🔐 Panel administratora',admFirst:'Pierwsze uruchomienie — ustaw PIN właściciela.',
+  newPin:'Nowy PIN (4–8 cyfr)',setPin:'Ustaw PIN',admOnly:'Dostęp tylko dla właściciela platformy.',pin:'PIN',unlock:'Odblokuj',
+  vPin:'PIN: 4–8 cyfr.',pinSet:'PIN ustawiony.',pinBad:'Błędny PIN.',
+  admSub:'Kontrola rejestracji i modelu „Pierwsze 100".',
+  admTotal:'Zarejestrowanych łącznie',admFree:'Wolne konta Założyciela',admSubs:'Przyszli subskrybenci (3,99$/mies.)',
+  admChart:'Przyrost rejestracji (ostatnie dni)',admList:'Lista kont ({n})',
+  colNo:'#',colNick:'Nick',colEmail:'E-mail',colDate:'Data',colStatus:'Status',colTrust:'Trust',
+  stFounder:'Założyciel',stPaid:'3,99$/mies.',
+  admPay:'💳 Integracja płatności celowo <b>wyłączona</b> w MVP — konta 101+ widzą tylko ekran informacyjny o subskrypcji. Bramkę (Stripe) dodamy w fazie 2 na Twoje polecenie.',
+  setTitle:'Ustawienia',setSub:'Dane, synchronizacja i narzędzia deweloperskie.',
+  langTitle:'🌐 Język',
+  dbTitle:'💾 Baza danych (tryb lokalny)',
+  dbInfo:'Dane trzymane są lokalnie. Eksportuj plik JSON do folderu OneDrive/Google Drive, aby mieć kopię i ręczną synchronizację między komputerami. Faza 2: wspólny backend (Supabase) — schemat gotowy w pliku <code>supabase-schema.sql</code>.',
+  exportBtn:'⬇ Eksportuj bazę (JSON)',importBtn:'⬆ Importuj bazę',
+  gTitle:'🔑 Logowanie przez Google',
+  gInfo:'Wklej OAuth Client ID (Google Cloud Console → Google Auth Platform → Klienci → aplikacja internetowa). W polu „Autoryzowane źródła JavaScript" musi być adres, z którego otwierasz appkę (np. <code>http://localhost:8377</code>). Uwaga: logowanie Google nie działa z pliku <code>file://</code> — tylko przez http/https.',
+  gSaveBtn:'Zapisz Client ID',
+  gSaved:'Client ID zapisany — przycisk Google aktywny na ekranie logowania.',gRemoved:'Client ID usunięty.',
+  gBad:'Client ID powinien kończyć się na .apps.googleusercontent.com',
+  demoTitle:'🧪 Dane przykładowe',
+  demoInfo:'Wczytaj przykładowych deweloperów i gry, żeby zobaczyć giełdę, panel i admin w akcji.',
+  demoBtn:'Wczytaj dane przykładowe',demoLoaded:'🧪 Dane przykładowe wczytane ({n} deweloperów, gry na giełdzie).',
+  dangerTitle:'⚠️ Strefa niebezpieczna',resetBtn:'Wyzeruj całą aplikację',resetConfirm:'Na pewno? To usunie WSZYSTKIE dane lokalne.',
+  logout:'Wyloguj',
+  footer:'PlayTest Connect v0.1 MVP · Regulamin: platforma służy wyłącznie uczciwej wymianie testów. Zakazane: emulatory, boty, farmy kont oraz wymuszanie ocen/recenzji w Sklepie Play. Naruszenie = ban i utrata punktów.',
+  exported:'Baza wyeksportowana — zapisz plik w folderze OneDrive.',
+  imported:'Baza zaimportowana.',importBad:'Nieprawidłowy plik bazy.',
+  vNick:'Nick musi mieć min. 3 znaki.',vEmail:'Podaj prawidłowy e-mail.',
+  vBoth:'Zaznacz oba oświadczenia.',
+  welcomeBack:'👋 Witaj ponownie, {n}!',
+  welcomeFounder:'🎉 Witaj, Założycielu! Konto darmowe na zawsze.',created:'Konto utworzone.',
+  gReadErr:'Nie udało się odczytać danych Google.',gNoMail:'Konto Google bez zweryfikowanego e-maila.',
+  finishTitle:'Dokończ rejestrację',createAcc:'Utwórz konto',
+  optinLinkLbl:'Link opt-in'
+}};
+let S=loadState();
+let LANG=S.lang||'en';
+function t(k,vars){let s=(T[LANG][k]!==undefined?T[LANG][k]:T.en[k])||k;if(vars)Object.entries(vars).forEach(([kk,v])=>{s=s.split('{'+kk+'}').join(v);});return s;}
+function setLang(l){LANG=l;S.lang=l;save();document.documentElement.lang=l;render();}
+
+function defaultState(){return{version:1,me:null,adminPin:null,lang:'en',users:[],apps:[],matches:[]};}
+function loadState(){try{const raw=localStorage.getItem(LS_KEY);return raw?JSON.parse(raw):defaultState();}catch(e){return defaultState();}}
+function save(){localStorage.setItem(LS_KEY,JSON.stringify(S));}
+function uid(){return Math.random().toString(36).slice(2,10);}
+function todayISO(){return new Date().toISOString().slice(0,10);}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function daysDiff(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
+function me(){return S.users.find(u=>u.id===S.me);}
+function isMaster(){const m=me();return !!m&&m.email===MASTER_ADMIN_EMAIL;}
+function userById(id){return S.users.find(u=>u.id===id);}
+function appById(id){return S.apps.find(a=>a.id===id);}
+
+/* ---------- 14-DAY CONTINUITY LOGIC (the heart of the app) ---------- */
+/* Returns the current UNBROKEN check-in streak ending today or yesterday.
+   A gap of more than 1 day = streak reset (exactly how Google counts it). */
+function streak(m){
+  if(!m.checkins.length) return 0;
+  const dates=[...new Set(m.checkins.map(c=>c.date))].sort();
+  let run=1;
+  for(let i=dates.length-1;i>0;i--){
+    if(daysDiff(dates[i-1],dates[i])===1) run++; else break;
+  }
+  const last=dates[dates.length-1];
+  const gap=daysDiff(last,todayISO());
+  if(gap>1) return 0;            // gap — streak reset
+  return run;
+}
+function lastCheckin(m){return m.checkins.length?[...m.checkins.map(c=>c.date)].sort().pop():null;}
+function checkedToday(m){return m.checkins.some(c=>c.date===todayISO());}
+function dayNumber(m){return streak(m);}
+
+/* ---------- TRUST SCORE ---------- */
+function trust(u){
+  const asTester=S.matches.filter(m=>m.testerId===u.id);
+  let tt=50;
+  tt+=asTester.filter(m=>m.status==='done').length*12;
+  tt-=asTester.filter(m=>m.status==='abandoned').length*15;
+  asTester.filter(m=>m.status==='active').forEach(m=>{tt+=Math.min(streak(m),14);});
+  const withFeedback=asTester.filter(m=>m.surveys&&(m.surveys.d7||m.surveys.d14)).length;
+  tt+=withFeedback*4;
+  return Math.max(0,Math.min(100,Math.round(tt)));
+}
+function points(u){
+  let p=0;
+  S.matches.filter(m=>m.testerId===u.id).forEach(m=>{p+=m.checkins.length*10;if(m.status==='done')p+=50;});
+  return p;
+}
+
+/* ---------- TOAST / MODAL ---------- */
+let toastT;
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>el.style.display='none',3500);}
+function modal(html){document.getElementById('modalBox').innerHTML=html;document.getElementById('modalWrap').classList.add('open');}
+function closeModal(){document.getElementById('modalWrap').classList.remove('open');}
+document.addEventListener('click',e=>{if(e.target.id==='modalWrap')closeModal();});
+
+/* ---------- GOOGLE SIGN-IN (Google Identity Services) ---------- */
+function googleClientId(){return (S.googleClientId||DEFAULT_GOOGLE_CLIENT_ID||'').trim();}
+function parseJwt(tok){
+  const b=tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+  return JSON.parse(decodeURIComponent(Array.prototype.map.call(atob(b),c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join('')));
+}
+let gisReady=false,gisClientUsed='';
+function maybeInitGoogle(){
+  const cid=googleClientId();
+  if(!cid||!window.google||!google.accounts) return;
+  if(!gisReady||gisClientUsed!==cid){ // initialize once per Client ID (re-init only when the ID changes)
+    google.accounts.id.initialize({client_id:cid,callback:onGoogleCredential});
+    gisReady=true;gisClientUsed=cid;
+  }
+  const el=document.getElementById('gBtn');
+  if(el){el.innerHTML='';google.accounts.id.renderButton(el,{theme:'filled_black',size:'large',text:'continue_with',locale:LANG==='pl'?'pl':'en',width:300});}
+}
+function onGoogleCredential(resp){
+  let p;
+  try{p=parseJwt(resp.credential);}catch(e){toast(t('gReadErr'));return;}
+  const email=(p.email||'').toLowerCase();
+  if(!email||!p.email_verified){toast(t('gNoMail'));return;}
+  const existing=S.users.find(u=>u.email===email);
+  if(existing){ // returning user — sign in
+    S.me=existing.id;existing.google=true;if(p.picture)existing.picture=p.picture;save();
+    toast(t('welcomeBack',{n:existing.nick}));render();return;
+  }
+  // new account — finish sign-up (nickname + declarations)
+  const suggested=(p.given_name||p.name||email.split('@')[0]).replace(/\s+/g,'').slice(0,24);
+  modal(`<h2 style="margin-top:0">${t('finishTitle')}</h2>
+  <div class="row" style="margin:10px 0">${p.picture?`<img src="${esc(p.picture)}" style="width:44px;height:44px;border-radius:50%">`:''}<div><b>${esc(p.name||'')}</b><div class="muted">${esc(email)}</div></div></div>
+  <label>${t('nick')}</label><input id="gNick" maxlength="24" value="${esc(suggested)}">
+  <label style="display:flex;align-items:flex-start;gap:8px;margin-top:14px;font-weight:400;color:var(--text)"><input type="checkbox" id="gDevice" style="width:auto;margin-top:3px"> <span>${t('declDevice')}</span></label>
+  <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-weight:400;color:var(--text)"><input type="checkbox" id="gTerms" style="width:auto;margin-top:3px"> <span>${t('declTerms')}</span></label>
+  <button class="btn" style="width:100%;margin-top:18px" onclick="finishGoogleReg('${esc(email)}','${esc(p.picture||'')}')">${t('createAcc')}</button>`);
+}
+function finishGoogleReg(email,picture){
+  const nick=document.getElementById('gNick').value.trim();
+  if(nick.length<3){toast(t('vNick'));return;}
+  if(!document.getElementById('gDevice').checked||!document.getElementById('gTerms').checked){toast(t('vBoth'));return;}
+  const founder=S.users.length<FREE_LIMIT;
+  const u={id:uid(),nick,email,founder,createdAt:todayISO(),demo:false,google:true,picture:picture||null};
+  S.users.push(u);S.me=u.id;save();closeModal();
+  toast(founder?t('welcomeFounder'):t('created'));
+  render();
+}
+
+/* ---------- ROUTER ---------- */
+const VIEW_KEYS=['dashboard','myapps','exchange','mytests','reputation','admin','settings'];
+let view='dashboard';
+function nav(v){view=v;render();}
+
+function langSwitcher(){
+  return `<div class="langsw"><button class="${LANG==='en'?'on':''}" onclick="setLang('en')">EN</button><button class="${LANG==='pl'?'on':''}" onclick="setLang('pl')">PL</button></div>`;
+}
+
+function render(){
+  const root=document.getElementById('root');
+  if(!S.me){root.innerHTML=registerView();maybeInitGoogle();return;}
+  const nick=me()?me().nick:'';
+  root.innerHTML=`
+  <div id="layout">
+    <div id="sidebar">
+      <div class="logo">▶ PlayTest <span>Connect</span></div>
+      ${VIEW_KEYS.filter(k=>k!=='admin'||isMaster()).map(k=>{const lbl=t('nav_'+k);return `<button class="navbtn ${view===k?'active':''}" onclick="nav('${k}')"><span>${lbl.split(' ')[0]}</span><span class="lbl">${lbl.split(' ').slice(1).join(' ')}</span></button>`;}).join('')}
+      ${langSwitcher()}
+      <div class="bottom">${t('signedAs')}: <b>${esc(nick)}</b><br>${t('localMode')}</div>
+    </div>
+    <div id="main">${({dashboard:dashboardView,myapps:myAppsView,exchange:exchangeView,mytests:myTestsView,reputation:reputationView,admin:adminView,settings:settingsView})[view]()}</div>
+  </div>`;
+}
+
+/* ============ REGISTRATION ============ */
+function registerView(){
+  const count=S.users.length, left=Math.max(0,FREE_LIMIT-count);
+  return `<div id="registerView">
+    <div style="display:flex;justify-content:flex-end">${langSwitcher()}</div>
+    <div style="text-align:center;margin-bottom:26px">
+      <div style="font-size:34px;font-weight:800">▶ PlayTest <span style="color:var(--accent)">Connect</span></div>
+      <div class="muted" style="margin-top:6px">${t('tagline')}</div>
+    </div>
+    <div class="founderBanner">${t('founderLeft',{n:left,max:FREE_LIMIT})}${left===0?' <span class="badge amber">'+t('founderGone')+'</span>':''}</div>
+    <div class="card">
+      <h2 style="margin-top:0">${t('signTitle')}</h2>
+      ${googleClientId()?`
+      <div id="gBtn" style="display:flex;justify-content:center;margin:16px 0"></div>
+      <div class="row" style="justify-content:center;margin:6px 0 4px"><span class="muted">${t('orEmail')}</span></div>`
+      :`<div class="alert amber" style="margin-top:10px">${t('googleOff')}</div>`}
+      <label>${t('nick')}</label><input id="regNick" maxlength="24" placeholder="${t('nickPh')}">
+      <label>${t('email')}</label><input id="regEmail" type="email" placeholder="you@gmail.com">
+      <label style="display:flex;align-items:flex-start;gap:8px;margin-top:16px;font-weight:400;color:var(--text)"><input type="checkbox" id="regDevice" style="width:auto;margin-top:3px"> <span>${t('declDevice')}</span></label>
+      <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-weight:400;color:var(--text)"><input type="checkbox" id="regTerms" style="width:auto;margin-top:3px"> <span>${t('declTerms')}</span></label>
+      <button class="btn" style="width:100%;margin-top:20px" onclick="doRegister()">${t('registerBtn')} ${left>0?t('registerFree'):''}</button>
+      <div class="muted" style="margin-top:14px;text-align:center">${t('accountNo',{n:count+1,max:FREE_LIMIT})}</div>
+    </div>
+  </div>`;
+}
+function doRegister(){
+  const nick=document.getElementById('regNick').value.trim();
+  const email=document.getElementById('regEmail').value.trim().toLowerCase();
+  if(nick.length<3){toast(t('vNick'));return;}
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast(t('vEmail'));return;}
+  const existing=S.users.find(u=>u.email===email);
+  if(existing){S.me=existing.id;save();toast(t('welcomeBack',{n:existing.nick}));render();return;}
+  if(!document.getElementById('regDevice').checked||!document.getElementById('regTerms').checked){toast(t('vBoth'));return;}
+  const founder=S.users.length<FREE_LIMIT;
+  const u={id:uid(),nick,email,founder,createdAt:todayISO(),demo:false};
+  S.users.push(u);S.me=u.id;save();
+  toast(founder?t('welcomeFounder'):t('created'));
+  render();
+}
+
+/* ============ DASHBOARD ============ */
+function dashboardView(){
+  const my=me();
+  const myApps=S.apps.filter(a=>a.ownerId===my.id);
+  const myTesting=S.matches.filter(m=>m.testerId===my.id&&m.status==='active');
+  const todo=myTesting.filter(m=>m.started&&!checkedToday(m));
+  const count=S.users.length,left=Math.max(0,FREE_LIMIT-count);
+
+  let alerts='';
+  myApps.forEach(a=>{
+    S.matches.filter(m=>m.appId===a.id&&m.status==='active'&&m.started).forEach(m=>{
+      const last=lastCheckin(m),gap=last?daysDiff(last,todayISO()):99;
+      const tu=userById(m.testerId);
+      if(gap>=2) alerts+=`<div class="alert red">${t('alertReset',{t:esc(tu?tu.nick:'?'),a:esc(a.title),n:gap})}</div>`;
+      else if(gap===1&&!checkedToday(m)) alerts+=`<div class="alert amber">${t('alertToday',{t:esc(tu?tu.nick:'?'),a:esc(a.title)})}</div>`;
+    });
+  });
+
+  return `<h1>${t('dashTitle')}</h1><div class="sub">${t('hello',{n:esc(my.nick)})} ${isMaster()?'<span class="badge blue">👑 Master Admin</span> ':''}${my.founder?'<span class="badge green">'+t('founderBadge')+'</span>':''}</div>
+  <div class="founderBanner">${t('registered',{n:count,left:left,max:FREE_LIMIT})}</div>
+  ${alerts}
+  <div class="grid c3">
+    <div class="card"><div class="muted">${t('statMyApps')}</div><div class="stat">${myApps.filter(a=>a.status!=='draft').length}</div></div>
+    <div class="card"><div class="muted">${t('statTesting')}</div><div class="stat">${myTesting.length}</div></div>
+    <div class="card"><div class="muted">${t('statPoints')}</div><div class="stat" style="color:var(--accent)">${points(my)}</div></div>
+  </div>
+  <h2>${t('todayTitle',{n:todo.length})}</h2>
+  ${todo.length?todo.map(m=>{const a=appById(m.appId);return `
+    <div class="card spread"><div class="row"><div class="appicon">🎮</div><div><b>${esc(a.title)}</b><div class="muted">${t('dayOf',{d:dayNumber(m)+1,max:REQUIRED_DAYS})} · ${t('by')} ${esc(userById(a.ownerId)?.nick||'?')}</div></div></div>
+    <button class="btn" onclick="openCheckin('${m.id}')">${t('checkinBtn')}</button></div>`;}).join('')
+  :'<div class="card muted">'+t('todayEmpty')+'</div>'}
+  <h2>${t('progressTitle')}</h2>
+  ${myApps.filter(a=>a.status!=='draft').length?myApps.filter(a=>a.status!=='draft').map(a=>appProgressCard(a)).join(''):'<div class="card muted">'+t('progressEmpty')+'</div>'}`;
+}
+function appProgressCard(a){
+  const ms=S.matches.filter(m=>m.appId===a.id&&m.status==='active'&&m.started);
+  const qualified=ms.filter(m=>streak(m)>=REQUIRED_DAYS).length;
+  const activeCount=ms.length;
+  return `<div class="card">
+    <div class="spread"><div class="row"><div class="appicon">🎮</div><div><b>${esc(a.title)}</b> <span class="badge ${a.status==='searching'?'blue':'green'}">${a.status==='searching'?t('searching'):t('inTest')}</span></div></div>
+    <div><span class="stat">${activeCount}<small>${t('testers',{n:TARGET_TESTERS})}</small></span></div></div>
+    <div class="progress"><div style="width:${Math.min(100,activeCount/TARGET_TESTERS*100)}%"></div></div>
+    <div class="muted">${t('recommend',{n:TARGET_TESTERS,min:GOOGLE_MIN_TESTERS})}<b style="color:var(--accent)">${qualified}</b></div>
+    ${ms.map(m=>{const tu=userById(m.testerId);const s=streak(m);const gap=lastCheckin(m)?daysDiff(lastCheckin(m),todayISO()):0;
+      return `<div style="margin-top:10px"><div class="spread"><span>${esc(tu?tu.nick:'?')} <span class="muted">(${t('trust')} ${trust(tu)})</span></span><span class="${s>=REQUIRED_DAYS?'badge green':gap>=2?'badge red':'badge gray'}">${s>=REQUIRED_DAYS?t('full14'):gap>=2?t('streakZero'):t('dayXof',{d:s,max:REQUIRED_DAYS})}</span></div>
+      <div class="progress"><div style="width:${Math.min(100,s/REQUIRED_DAYS*100)}%;${gap>=2?'background:var(--danger)':''}"></div></div></div>`;}).join('')}  </div>`;
+}
+
+/* ============ MY GAMES ============ */
+function myAppsView(){
+  const my=me();const myApps=S.apps.filter(a=>a.ownerId===my.id);
+  return `<h1>${t('myappsTitle')}</h1><div class="sub">${t('myappsSub')}</div>
+  <button class="btn" onclick="openAddApp()">${t('addGame')}</button>
+  <div style="height:18px"></div>
+  ${myApps.length?myApps.map(a=>`
+    <div class="card spread">
+      <div class="row"><div class="appicon">🎮</div><div><b>${esc(a.title)}</b> <span class="badge ${a.status==='draft'?'gray':a.status==='searching'?'blue':'green'}">${{draft:t('draft'),searching:t('searching'),testing:t('inTest')}[a.status]}</span>
+      <div class="muted">${esc(a.desc||'')}</div>
+      <div class="muted" style="word-break:break-all">🔗 ${esc(a.link)}</div></div></div>
+      <div class="row">
+        ${a.status==='draft'?`<button class="btn small" onclick="publishApp('${a.id}')">${t('publish')}</button>`:''}
+        <button class="btn small sec" onclick="deleteApp('${a.id}')">${t('del')}</button>
+      </div>
+    </div>`).join(''):'<div class="card muted">'+t('noGames')+'</div>'}`;
+}
+function openAddApp(){
+  modal(`<h2 style="margin-top:0">${t('addTitle')}</h2>
+  <label>${t('gameTitle')}</label><input id="apTitle" maxlength="60" placeholder="${t('gameTitlePh')}">
+  <label>${t('gameDesc')}</label><textarea id="apDesc" rows="3" maxlength="300" placeholder="${t('gameDescPh')}"></textarea>
+  <label>${t('optinLink')}</label><input id="apLink" placeholder="https://play.google.com/apps/testing/com.your.game">
+  <div class="muted" style="margin-top:8px">${t('optinHint')}</div>
+  <div class="row" style="margin-top:20px"><button class="btn" onclick="addApp()">${t('save')}</button><button class="btn sec" onclick="closeModal()">${t('cancel')}</button></div>`);
+}
+function addApp(){
+  const title=document.getElementById('apTitle').value.trim();
+  const desc=document.getElementById('apDesc').value.trim();
+  const link=document.getElementById('apLink').value.trim();
+  if(title.length<2){toast(t('vTitle'));return;}
+  if(!/^https:\/\/play\.google\.com\/apps\/testing\/[\w.]+/.test(link)){toast(t('vLink'));return;}
+  S.apps.push({id:uid(),ownerId:S.me,title,desc,link,status:'draft',createdAt:todayISO()});
+  save();closeModal();toast(t('savedDraft'));render();
+}
+function publishApp(id){const a=appById(id);a.status='searching';save();toast(t('published'));render();}
+function deleteApp(id){
+  if(S.matches.some(m=>m.appId===id&&m.status==='active')){toast(t('cantDelete'));return;}
+  S.apps=S.apps.filter(a=>a.id!==id);S.matches=S.matches.filter(m=>m.appId!==id);save();render();
+}
+
+/* ============ TEST EXCHANGE ============ */
+function exchangeView(){
+  const my=me();
+  const avail=S.apps.filter(a=>a.ownerId!==my.id&&(a.status==='searching'||a.status==='testing')&&!S.matches.some(m=>m.appId===a.id&&m.testerId===my.id));
+  return `<h1>${t('exTitle')}</h1><div class="sub">${t('exSub')}</div>
+  ${avail.length?avail.map(a=>{const o=userById(a.ownerId);const cnt=S.matches.filter(m=>m.appId===a.id&&m.status==='active').length;
+    return `<div class="card spread">
+      <div class="row"><div class="appicon">🎮</div><div><b>${esc(a.title)}</b>
+      <div class="muted">${esc(a.desc||'')}</div>
+      <div class="muted">${t('author')} <b>${esc(o?o.nick:'?')}</b> · ${t('trust')} <span class="badge ${trust(o)>=70?'green':'amber'}">${trust(o)}</span> · ${cnt}/${TARGET_TESTERS}</div></div></div>
+      <button class="btn" onclick="acceptChallenge('${a.id}')">${t('accept')}</button>
+    </div>`;}).join(''):'<div class="card muted">'+t('exEmpty')+'</div>'}`;
+}
+function acceptChallenge(appId){
+  const a=appById(appId);
+  S.matches.push({id:uid(),appId,testerId:S.me,accepted:todayISO(),started:null,checkins:[],surveys:{d7:null,d14:null},screenshot:null,status:'active'});
+  if(a.status==='searching')a.status='testing';
+  save();
+  modal(`<h2 style="margin-top:0">${t('acceptedTitle')}</h2>
+  <p style="margin:10px 0">${t('optinFor',{a:esc(a.title)})}</p>
+  <div class="card" style="word-break:break-all;margin:12px 0">${esc(a.link)}</div>
+  <ol style="margin:12px 0 12px 20px;line-height:1.7;font-size:14px">${t('steps')}</ol>
+  <div class="alert amber">${t('warn14')}</div>
+  <button class="btn" onclick="closeModal();nav('mytests')">${t('goMyTests')}</button>`);
+  render();
+}
+
+/* ============ MY TESTS ============ */
+function myTestsView(){
+  const ms=S.matches.filter(m=>m.testerId===S.me);
+  return `<h1>${t('mtTitle')}</h1><div class="sub">${t('mtSub')}</div>
+  ${ms.length?ms.map(m=>{const a=appById(m.appId);if(!a)return '';const s=streak(m);const done=m.status==='done';
+    return `<div class="card">
+    <div class="spread"><div class="row"><div class="appicon">🎮</div><div><b>${esc(a.title)}</b> <span class="badge ${done?'green':m.status==='abandoned'?'red':'blue'}">${done?t('stDone'):m.status==='abandoned'?t('stAbandoned'):m.started?t('dayOf',{d:s,max:REQUIRED_DAYS}):t('stWaiting')}</span>
+    <div class="muted">${t('author')} ${esc(userById(a.ownerId)?.nick||'?')}</div></div></div>
+    <div class="row">
+    ${!m.started&&m.status==='active'?`<button class="btn" onclick="startTest('${m.id}')">${t('startBtn')}</button>`:''}
+    ${m.started&&m.status==='active'&&!checkedToday(m)?`<button class="btn" onclick="openCheckin('${m.id}')">${t('checkinBtn')}</button>`:''}
+    ${m.started&&m.status==='active'&&checkedToday(m)?`<span class="badge green">${t('doneToday')}</span>`:''}
+    </div></div>
+    ${m.started?`<div class="progress"><div style="width:${Math.min(100,s/REQUIRED_DAYS*100)}%"></div></div>
+    <div class="muted">${t('optinLinkLbl')}: <span style="word-break:break-all">${esc(a.link)}</span></div>
+    ${s>=7&&!m.surveys.d7&&m.status==='active'?`<div class="alert amber" style="margin-top:10px">${t('d7due',{id:m.id})}</div>`:''}
+    ${s>=REQUIRED_DAYS&&!m.surveys.d14&&m.status==='active'?`<div class="alert green" style="margin-top:10px">${t('d14due',{id:m.id})}</div>`:''}
+    `:''}
+    </div>`;}).join(''):'<div class="card muted">'+t('mtEmpty')+'</div>'}`;
+}
+function startTest(id){
+  modal(`<h2 style="margin-top:0">${t('startTitle')}</h2>
+  <p style="margin:10px 0;font-size:14px">${t('startInfo')}</p>
+  <label>${t('shotLabel')}</label><input type="file" id="shot" accept="image/*">
+  <label>${t('firstNote')}</label><textarea id="note0" rows="2" placeholder="${t('firstNotePh')}"></textarea>
+  <div class="row" style="margin-top:18px"><button class="btn" onclick="confirmStart('${id}')">${t('startTimer')}</button><button class="btn sec" onclick="closeModal()">${t('cancel')}</button></div>`);
+}
+function confirmStart(id){
+  const m=S.matches.find(x=>x.id===id);
+  const f=document.getElementById('shot').files[0];
+  const note=document.getElementById('note0').value.trim();
+  if(!f){toast(t('vShot'));return;}
+  if(note.length<10){toast(t('vNote'));return;}
+  const r=new FileReader();
+  r.onload=()=>{
+    m.screenshot={name:f.name,taken:todayISO(),data:String(r.result).slice(0,200000)};
+    m.started=todayISO();
+    m.checkins.push({date:todayISO(),note});
+    save();closeModal();toast(t('started'));render();
+  };
+  r.readAsDataURL(f);
+}
+function openCheckin(id){
+  const m=S.matches.find(x=>x.id===id);const a=appById(m.appId);
+  modal(`<h2 style="margin-top:0">${t('ciTitle',{a:esc(a.title)})}</h2>
+  <p class="muted" style="margin:8px 0">${t('ciInfo',{d:streak(m)+1,max:REQUIRED_DAYS})}</p>
+  <textarea id="ciNote" rows="3" placeholder="${t('ciPh')}"></textarea>
+  <div class="row" style="margin-top:18px"><button class="btn" onclick="doCheckin('${id}')">${t('ciBtn')}</button><button class="btn sec" onclick="closeModal()">${t('cancel')}</button></div>`);
+}
+function doCheckin(id){
+  const m=S.matches.find(x=>x.id===id);
+  if(checkedToday(m)){toast(t('ciDup'));closeModal();return;}
+  const note=document.getElementById('ciNote').value.trim();
+  if(note.length<10){toast(t('ciShort'));return;}
+  m.checkins.push({date:todayISO(),note});save();closeModal();
+  const s=streak(m);
+  toast(s>=REQUIRED_DAYS?t('ci14'):t('ciOk',{d:s,max:REQUIRED_DAYS}));
+  render();
+}
+function openSurvey(id,which){
+  const m=S.matches.find(x=>x.id===id);const a=appById(m.appId);
+  modal(`<h2 style="margin-top:0">${t(which==='d7'?'svTitleD7':'svTitleD14',{a:esc(a.title)})}</h2>
+  <p class="muted" style="margin:8px 0">${t('svInfo')}</p>
+  <label>${t('q1')}</label><textarea id="q1" rows="2"></textarea>
+  <label>${t('q2')}</label><textarea id="q2" rows="2"></textarea>
+  <label>${t('q3')}</label><textarea id="q3" rows="2"></textarea>
+  <div class="row" style="margin-top:18px"><button class="btn" onclick="submitSurvey('${id}','${which}')">${t('svSend')}</button><button class="btn sec" onclick="closeModal()">${t('svLater')}</button></div>`);
+}
+function submitSurvey(id,which){
+  const m=S.matches.find(x=>x.id===id);
+  const q1=document.getElementById('q1').value.trim(),q2=document.getElementById('q2').value.trim(),q3=document.getElementById('q3').value.trim();
+  if((q1+q2+q3).length<30){toast(t('svShort'));return;}
+  m.surveys[which]={q1,q2,q3,date:todayISO()};
+  if(which==='d14'&&streak(m)>=REQUIRED_DAYS){m.status='done';toast(t('svDone'));}
+  else toast(t('svSaved'));
+  save();closeModal();render();
+}
+
+/* ============ REPUTATION ============ */
+function reputationView(){
+  const my=me();const tv=trust(my);const p=points(my);
+  const done=S.matches.filter(m=>m.testerId===my.id&&m.status==='done').length;
+  const color=tv>=70?'var(--accent)':tv>=40?'var(--warn)':'var(--danger)';
+  return `<h1>${t('repTitle')}</h1><div class="sub">${t('repSub')}</div>
+  <div class="grid c2">
+    <div class="card" style="text-align:center">
+      <div class="ring" style="background:conic-gradient(${color} ${tv*3.6}deg, var(--card2) 0deg)"><div style="width:92px;height:92px;border-radius:50%;background:var(--card);display:flex;align-items:center;justify-content:center">${tv}</div></div>
+      <div style="margin-top:12px;font-weight:600">${t('trustScore')}</div>
+      <div class="muted">${tv>=70?t('trustHigh'):tv>=40?t('trustMid'):t('trustLow')}</div>
+    </div>
+    <div class="card">
+      <div class="spread"><span class="muted">${t('repPoints')}</span><b style="color:var(--accent)">${p}</b></div><hr style="border-color:var(--border);margin:10px 0">
+      <div class="spread"><span class="muted">${t('repCycles')}</span><b>${done}</b></div><hr style="border-color:var(--border);margin:10px 0">
+      <div class="spread"><span class="muted">${t('repActive')}</span><b>${S.matches.filter(m=>m.testerId===my.id&&m.status==='active').length}</b></div><hr style="border-color:var(--border);margin:10px 0">
+      <div class="spread"><span class="muted">${t('repBadges')}</span><span>${my.founder?'<span class="badge green">'+t('founderBadge')+'</span> ':''}${done>=1?'<span class="badge blue">'+t('bFinisher')+'</span> ':''}${done>=3?'<span class="badge green">'+t('bPro')+'</span>':''}</span></div>
+    </div>
+  </div>
+  <div class="card"><b>${t('howTrust')}</b><ul style="margin:10px 0 0 20px;line-height:1.9;font-size:14px;color:var(--muted)">${t('howTrustList')}</ul></div>`;
+}
+
+/* ============ ADMIN ============ */
+let adminUnlocked=false;
+function adminView(){
+  if(!isMaster()&&view==='admin'){view='dashboard';return dashboardView();} // admin is master-only
+  if(isMaster())adminUnlocked=true; // the owner's account needs no PIN
+  if(!S.adminPin&&!isMaster()){
+    return `<h1>${t('admTitle')}</h1><div class="sub">${t('admFirst')}</div>
+    <div class="card" style="max-width:420px"><label>${t('newPin')}</label><input id="pinNew" type="password" maxlength="8" inputmode="numeric">
+    <button class="btn" style="margin-top:16px" onclick="setPin()">${t('setPin')}</button></div>`;
+  }
+  if(!adminUnlocked){
+    return `<h1>${t('admTitle')}</h1><div class="sub">${t('admOnly')}</div>
+    <div class="card" style="max-width:420px"><label>${t('pin')}</label><input id="pinIn" type="password" maxlength="8" inputmode="numeric" onkeydown="if(event.key==='Enter')unlockAdmin()">
+    <button class="btn" style="margin-top:16px" onclick="unlockAdmin()">${t('unlock')}</button></div>`;
+  }
+  const count=S.users.length,left=Math.max(0,FREE_LIMIT-count);
+  const byDay={};S.users.forEach(u=>{byDay[u.createdAt]=(byDay[u.createdAt]||0)+1;});
+  const days=Object.keys(byDay).sort().slice(-14);
+  const maxV=Math.max(1,...days.map(d=>byDay[d]));
+  return `<h1>${t('admTitle')}</h1><div class="sub">${t('admSub')}</div>
+  <div class="grid c3">
+    <div class="card"><div class="muted">${t('admTotal')}</div><div class="stat" style="color:var(--accent)">${count}</div></div>
+    <div class="card"><div class="muted">${t('admFree')}</div><div class="stat">${left}<small> / ${FREE_LIMIT}</small></div></div>
+    <div class="card"><div class="muted">${t('admSubs')}</div><div class="stat">${Math.max(0,count-FREE_LIMIT)}</div></div>
+  </div>
+  <div class="card"><b>${t('admChart')}</b>
+    <div class="bar-chart">${days.map(d=>`<div style="height:${byDay[d]/maxV*100}%" title="${d}: ${byDay[d]}"><span>${d.slice(5)}</span></div>`).join('')||'<div class="muted">—</div>'}</div>
+    <div style="height:20px"></div></div>
+  <div class="card"><b>${t('admList',{n:count})}</b>
+    <table style="margin-top:10px"><tr><th>${t('colNo')}</th><th>${t('colNick')}</th><th>${t('colEmail')}</th><th>${t('colDate')}</th><th>${t('colStatus')}</th><th>${t('colTrust')}</th></tr>
+    ${S.users.map((u,i)=>`<tr><td>${i+1}</td><td>${esc(u.nick)}${u.demo?' <span class="badge gray">demo</span>':''}</td><td>${esc(u.email)}</td><td>${u.createdAt}</td><td>${u.founder?'<span class="badge green">'+t('stFounder')+'</span>':'<span class="badge amber">'+t('stPaid')+'</span>'}</td><td>${trust(u)}</td></tr>`).join('')}
+    </table></div>
+  <div class="alert amber">${t('admPay')}</div>`;
+}
+function setPin(){const p=document.getElementById('pinNew').value.trim();if(!/^\d{4,8}$/.test(p)){toast(t('vPin'));return;}S.adminPin=p;save();adminUnlocked=true;toast(t('pinSet'));render();}
+function unlockAdmin(){if(document.getElementById('pinIn').value===S.adminPin){adminUnlocked=true;render();}else toast(t('pinBad'));}
+
+/* ============ SETTINGS ============ */
+function settingsView(){
+  return `<h1>${t('setTitle')}</h1><div class="sub">${t('setSub')}</div>
+  <div class="card"><b>${t('langTitle')}</b><div style="height:8px"></div>${langSwitcher()}</div>
+  <div class="card"><b>${t('dbTitle')}</b>
+  <p class="muted" style="margin:8px 0 14px">${t('dbInfo')}</p>
+  <div class="row"><button class="btn" onclick="exportJSON()">${t('exportBtn')}</button>
+  <label class="btn sec" style="width:auto;margin:0;cursor:pointer">${t('importBtn')}<input type="file" accept=".json" style="display:none" onchange="importJSON(event)"></label></div></div>
+  <div class="card"><b>${t('gTitle')}</b>
+  <p class="muted" style="margin:8px 0 14px">${t('gInfo')}</p>
+  <label>OAuth Client ID</label><input id="gcid" placeholder="e.g. 1234567890-abc123.apps.googleusercontent.com" value="${esc(S.googleClientId||'')}">
+  <button class="btn" style="margin-top:14px" onclick="saveClientId()">${t('gSaveBtn')}</button></div>
+  <div class="card"><b>${t('demoTitle')}</b>
+  <p class="muted" style="margin:8px 0 14px">${t('demoInfo')}</p>
+  <button class="btn sec" onclick="seedDemo()">${t('demoBtn')}</button></div>
+  <div class="card"><b>${t('dangerTitle')}</b><div style="height:10px"></div>
+  <div class="row"><button class="btn danger" onclick="if(confirm(t('resetConfirm'))){localStorage.removeItem(LS_KEY);location.reload();}">${t('resetBtn')}</button>
+  <button class="btn sec" onclick="S.me=null;save();render();">${t('logout')}</button></div></div>
+  <div class="card muted" style="font-size:13px">${t('footer')}</div>`;
+}
+function saveClientId(){
+  const v=document.getElementById('gcid').value.trim();
+  if(v&&!/\.apps\.googleusercontent\.com$/.test(v)){toast(t('gBad'));return;}
+  S.googleClientId=v;save();
+  toast(v?t('gSaved'):t('gRemoved'));
+}
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='playtest-connect-db-'+todayISO()+'.json';a.click();
+  toast(t('exported'));
+}
+function importJSON(ev){
+  const f=ev.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.users||!d.apps)throw 0;S=d;LANG=S.lang||'en';save();toast(t('imported'));render();}catch(e){toast(t('importBad'));}};
+  r.readAsText(f);
+}
+function iso(offsetDays){const d=new Date();d.setDate(d.getDate()+offsetDays);return d.toISOString().slice(0,10);}
+function seedDemo(){
+  const names=[['PixelPaul','paul@demo.dev'],['GameDevGrace','grace@demo.dev'],['IndieIgor','igor@demo.dev'],['RetroRita','rita@demo.dev'],['MobileMark','mark@demo.dev'],['StudioSam','sam@demo.dev'],['CasualKate','kate@demo.dev']];
+  const games=[['Neon Runner','Fast 2D platformer — test levels 1–5 and the shop','com.demo.neonrunner'],['Ball Master','Match-3 puzzle — check the tournament mode','com.demo.balls'],['Speedy Courier','Delivery sim — test the city map and missions','com.demo.courier'],['Mage Tower','Fantasy tower defense — balance of waves 10+','com.demo.tower']];
+  const newUsers=[];
+  names.forEach(([nick,email],i)=>{
+    if(S.users.some(u=>u.email===email))return;
+    const u={id:uid(),nick,email,founder:S.users.length<FREE_LIMIT,createdAt:iso(-13+i*2),demo:true};
+    S.users.push(u);newUsers.push(u);
+  });
+  games.forEach(([title,desc,pkg],i)=>{
+    const owner=newUsers[i%Math.max(1,newUsers.length)];
+    if(!owner||S.apps.some(a=>a.link.endsWith(pkg)))return;
+    S.apps.push({id:uid(),ownerId:owner.id,title,desc,link:'https://play.google.com/apps/testing/'+pkg,status:'searching',createdAt:iso(-6)});
+  });
+  // one live demo test between demo accounts so the dashboard has life
+  if(newUsers.length>=2&&S.apps.length){
+    const app=S.apps.find(a=>a.ownerId===newUsers[0].id);
+    if(app&&!S.matches.some(m=>m.appId===app.id)){
+      const m={id:uid(),appId:app.id,testerId:newUsers[1].id,accepted:iso(-5),started:iso(-5),checkins:[],surveys:{d7:null,d14:null},screenshot:null,status:'active'};
+      for(let d=-5;d<=0;d++)m.checkins.push({date:iso(d),note:'Tested level '+(6+d)+', works fine.'});
+      S.matches.push(m);app.status='testing';
+    }
+  }
+  save();toast(t('demoLoaded',{n:newUsers.length}));render();
+}
+
+/* start */
+document.documentElement.lang=LANG;
+render();
+</script>
+</body>
+</html>
