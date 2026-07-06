@@ -837,6 +837,12 @@ function seedDemo(){
   save();toast(t('demoLoaded',{n:newUsers.length}));render();
 }
 
+/* founder #1 — the platform owner is always the first registered account */
+if(!S.users.some(u=>u.email===MASTER_ADMIN_EMAIL)){
+  S.users.unshift({id:'founder-001',nick:'Kawalko34',email:MASTER_ADMIN_EMAIL,founder:true,createdAt:'2026-07-06',demo:false,google:true});
+  save();
+}
+
 /* start */
 document.documentElement.lang=LANG;
 render();
