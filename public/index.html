@@ -160,6 +160,8 @@ en:{
   shareBtn:'🔗 Invite / QR',copied:'Invite link copied — send it to testers! Anyone who opens it joins your test automatically.',
   qrInviteTitle:'Invite testers — {a}',qrScan:'Scan with a phone camera to join the test',
   qrOptin:'Scan with your phone to open the game in Google Play',copyLink:'📋 Copy link',
+  needGoogle:'This account signs in with Google — use the Google button above.',
+  alreadyJoined:'You already test this game — here is your test.',
   addTitle:'Add a game',gameTitle:'Game title',gameTitlePh:'e.g. Neon Runner',
   gameDesc:'Short description (what to test?)',gameDescPh:'e.g. 2D platformer — check levels 1–5, the shop and ads',
   optinLink:'Opt-in link from Google Play Console',
@@ -285,6 +287,8 @@ pl:{
   shareBtn:'🔗 Zaproś / QR',copied:'Link skopiowany — wyślij testerom! Kto go otworzy, automatycznie dołącza do Twojego testu.',
   qrInviteTitle:'Zaproś testerów — {a}',qrScan:'Zeskanuj aparatem telefonu, aby dołączyć do testu',
   qrOptin:'Zeskanuj telefonem, aby otworzyć grę w Google Play',copyLink:'📋 Kopiuj link',
+  needGoogle:'To konto loguje się przez Google — użyj przycisku Google powyżej.',
+  alreadyJoined:'Już testujesz tę grę — oto Twój test.',
   addTitle:'Dodaj grę',gameTitle:'Tytuł gry',gameTitlePh:'np. Neon Runner',
   gameDesc:'Krótki opis (co testować?)',gameDescPh:'np. platformówka 2D — sprawdź poziomy 1–5, sklep i reklamy',
   optinLink:'Link opt-in z Google Play Console',
@@ -391,15 +395,19 @@ function setLang(l){LANG=l;SESSION.lang=l;saveSession();document.documentElement
 
 async function api(op,payload={},silent=false){
   try{
-    const r=await fetch(API_BASE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op,email:SESSION.email||'',...payload})});
+    const r=await fetch(API_BASE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op,email:SESSION.email||'',token:SESSION.token||'',...payload})});
     const d=await r.json();
     if(d&&d.db)S=d.db;
+    if(d&&d.err==='auth'&&SESSION.meId){ // stale/invalid session — sign in again
+      delete SESSION.meId;delete SESSION.token;saveSession();render();
+    }
     return d||{ok:false,err:'empty'};
   }catch(e){if(!silent)toast(t('netErr'));return {ok:false,err:'net'};}
 }
 
 const uid=()=>Math.random().toString(36).slice(2,10);
-function todayISO(){return new Date().toISOString().slice(0,10);}
+/* LOCAL date (not UTC) — a check-in just after local midnight counts as the new day */
+function todayISO(){const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function daysDiff(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
 function me(){return S.users.find(u=>u.id===SESSION.meId);}
@@ -477,14 +485,16 @@ function maybeInitGoogle(){
   const el=document.getElementById('gBtn');
   if(el){el.innerHTML='';google.accounts.id.renderButton(el,{theme:'filled_black',size:'large',text:'continue_with',locale:LANG==='pl'?'pl':'en',width:300});}
 }
+let lastGoogleCred=null;
 async function onGoogleCredential(resp){
   let p;
   try{p=parseJwt(resp.credential);}catch(e){toast(t('gReadErr'));return;}
   const email=(p.email||'').toLowerCase();
   if(!email||!p.email_verified){toast(t('gNoMail'));return;}
-  const d=await api('register',{email,google:true,picture:p.picture||''});
+  lastGoogleCred=resp.credential; // server verifies this token — nobody can impersonate a Google account
+  const d=await api('register',{email,google:true,idToken:lastGoogleCred,picture:p.picture||''});
   if(d.ok){ // existing account — signed in
-    SESSION.meId=d.meId;SESSION.email=email;saveSession();
+    SESSION.meId=d.meId;SESSION.email=email;SESSION.token=d.token;saveSession();
     toast(t('welcomeBack',{n:(me()||{}).nick||''}));
     await afterLogin();return;
   }
@@ -502,9 +512,9 @@ async function finishGoogleReg(email,picture){
   const nick=document.getElementById('gNick').value.trim();
   if(nick.length<3){toast(t('vNick'));return;}
   if(!document.getElementById('gDevice').checked||!document.getElementById('gTerms').checked){toast(t('vBoth'));return;}
-  const d=await api('register',{email,nick,google:true,picture});
+  const d=await api('register',{email,nick,google:true,idToken:lastGoogleCred,picture});
   if(!d.ok){toast(d.err==='nickTaken'?t('nickTaken'):t('netErr'));return;}
-  SESSION.meId=d.meId;SESSION.email=email;saveSession();closeModal();
+  SESSION.meId=d.meId;SESSION.email=email;SESSION.token=d.token;saveSession();closeModal();
   toast((me()||{}).founder?t('welcomeFounder'):t('created'));
   await afterLogin();
 }
@@ -568,15 +578,17 @@ async function doRegister(){
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast(t('vEmail'));return;}
   const existing=await api('register',{email});
   if(existing.ok){ // known e-mail — sign in
-    SESSION.meId=existing.meId;SESSION.email=email;saveSession();
+    SESSION.meId=existing.meId;SESSION.email=email;SESSION.token=existing.token;saveSession();
     toast(t('welcomeBack',{n:(me()||{}).nick||''}));
     await afterLogin();return;
   }
+  if(existing.err==='needGoogle'){toast(t('needGoogle'));return;}
+  if(existing.err==='net'){return;}
   if(nick.length<3){toast(t('vNick'));return;}
   if(!document.getElementById('regDevice').checked||!document.getElementById('regTerms').checked){toast(t('vBoth'));return;}
   const d=await api('register',{email,nick});
   if(!d.ok){toast(d.err==='nickTaken'?t('nickTaken'):t('netErr'));return;}
-  SESSION.meId=d.meId;SESSION.email=email;saveSession();
+  SESSION.meId=d.meId;SESSION.email=email;SESSION.token=d.token;saveSession();
   toast((me()||{}).founder?t('welcomeFounder'):t('created'));
   await afterLogin();
 }
@@ -585,7 +597,10 @@ async function afterLogin(){
     const appId=SESSION.pendingJoin;
     delete SESSION.pendingJoin;saveSession();
     const a=appById(appId);
-    if(a&&a.ownerId!==(me()||{}).id&&!S.matches.some(m=>m.appId===appId&&m.testerId===SESSION.meId)){
+    if(a&&a.ownerId!==(me()||{}).id){
+      if(S.matches.some(m=>m.appId===appId&&m.testerId===SESSION.meId)){
+        view='mytests';render();toast(t('alreadyJoined'));return; // re-opened invite → go straight to your test
+      }
       await acceptChallenge(appId,true);return;
     }
   }
@@ -689,6 +704,10 @@ function openInvite(appId){
   </div>`);
 }
 function nativeShare(appId){const a=appById(appId);navigator.share({title:'Play Test — '+a.title,url:SITE+'/#join='+appId}).catch(()=>{});}
+function showQrApp(appId){ // id-based: titles with quotes can't break the onclick attribute
+  const a=appById(appId);if(!a)return;
+  showQr(a.title,a.link,t('qrOptin'));
+}
 function showQr(title,link,caption){
   modal(`<h2 style="margin-top:0">${esc(title)}</h2>
   <div style="text-align:center;margin:14px 0">${qrBlock(link)}<div class="muted" style="margin-top:8px">${caption}</div></div>
@@ -782,7 +801,7 @@ function myTestsView(){
     </div></div>
     ${!m.started?`<a class="btn sec" style="display:inline-block;text-decoration:none;margin-top:8px" href="${esc(a.link)}" target="_blank" rel="noopener">${t('openPlay')}</a>`:''}
     ${m.started?`<div class="progress"><div style="width:${Math.min(100,s/REQUIRED_DAYS*100)}%"></div></div>
-    <div class="muted">${t('optinLinkLbl')}: <span style="word-break:break-all">${esc(a.link)}</span> <button class="btn small sec" onclick="showQr('${esc(a.title)}','${esc(a.link)}',t('qrOptin'))">📱 QR</button></div>
+    <div class="muted">${t('optinLinkLbl')}: <span style="word-break:break-all">${esc(a.link)}</span> <button class="btn small sec" onclick="showQrApp('${a.id}')">📱 QR</button></div>
     ${s>=7&&!m.surveys.d7&&m.status==='active'?`<div class="alert amber" style="margin-top:10px">${t('d7due',{id:m.id})}</div>`:''}
     ${s>=REQUIRED_DAYS&&!m.surveys.d14&&m.status==='active'?`<div class="alert green" style="margin-top:10px">${t('d14due',{id:m.id})}</div>`:''}
     `:''}
@@ -817,7 +836,7 @@ async function confirmStart(id){
   let shot;
   try{shot=await compressImage(f);}catch(e){toast(t('vShot'));return;}
   const dev=await deviceCheck();
-  const d=await api('start',{matchId:id,note,screenshot:shot,device:dev.record});
+  const d=await api('start',{matchId:id,note,screenshot:shot,device:dev.record,localDate:todayISO()});
   if(!d.ok){toast(t('netErr'));return;}
   closeModal();toast(t('started'));render();
 }
@@ -831,7 +850,7 @@ function openCheckin(id){
 async function doCheckin(id){
   const note=document.getElementById('ciNote').value.trim();
   if(note.length<10){toast(t('ciShort'));return;}
-  const d=await api('checkin',{matchId:id,note});
+  const d=await api('checkin',{matchId:id,note,localDate:todayISO()});
   if(!d.ok){toast(d.err==='dup'?t('ciDup'):t('netErr'));closeModal();render();return;}
   closeModal();
   const m=S.matches.find(x=>x.id===id);
@@ -946,6 +965,9 @@ async function doInstall(){
 /* ---------- LIVE REFRESH (owner + admin see changes automatically) ---------- */
 async function pollState(){
   if(document.getElementById('modalWrap').classList.contains('open'))return;
+  // never wipe a form the user is typing into (e.g. the sign-up screen)
+  const ae=document.activeElement;
+  if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')&&ae.value)return;
   const before=JSON.stringify(S);
   const d=await api('state',{},true);
   if(d.ok&&JSON.stringify(S)!==before)render();

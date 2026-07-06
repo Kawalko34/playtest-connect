@@ -1,28 +1,28 @@
 /* Play Test — shared backend (Netlify Function + Netlify Blobs)
-   One JSON blob "db" holds users/apps/matches; screenshots stored as separate blobs. */
+   One JSON blob "db" holds users/apps/matches; screenshots stored as separate blobs.
+   Auth: session tokens issued at sign-in; Google accounts require a verified Google ID token. */
 import { getStore } from '@netlify/blobs';
 
 const MASTER = 'kawalko334411@gmail.com';
+const GOOGLE_CLIENT_ID = '832482048394-0be28ltmam33msagi9srk0hmrs0juctq.apps.googleusercontent.com';
 const FREE_LIMIT = 100;
 const REQUIRED_DAYS = 14;
+const ABANDON_AFTER_DAYS = 5;   // started test with no check-in for this long => abandoned
+const STALE_ACCEPT_DAYS = 7;    // accepted but never started for this long => abandoned
 
 /* strong consistency: every read sees the latest write (no stale edge cache) */
 const store = () => getStore({ name: 'playtest', consistency: 'strong' });
 const uid = () => Math.random().toString(36).slice(2, 10);
+const token = () => Array.from(crypto.getRandomValues(new Uint8Array(24)), b => b.toString(16).padStart(2, '0')).join('');
 const today = () => new Date().toISOString().slice(0, 10);
 const daysDiff = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
 
-async function loadDb() {
-  let db = await store().get('db', { type: 'json' });
-  if (!db || !Array.isArray(db.users)) db = { users: [], apps: [], matches: [] };
-  // founder #1 — platform owner is always the first registered account
-  if (!db.users.some(u => u.email === MASTER)) {
-    db.users.unshift({ id: 'founder-001', nick: 'Kawalko34', email: MASTER, founder: true, createdAt: '2026-07-06', google: true, demo: false });
-    await store().setJSON('db', db);
-  }
-  return db;
+/* the tester's own local date is authoritative for daily check-ins (fixes the midnight/UTC bug),
+   but only if it is within 1 day of the server clock */
+function effectiveDay(clientDate) {
+  if (typeof clientDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(clientDate) && Math.abs(daysDiff(clientDate, today())) <= 1) return clientDate;
+  return today();
 }
-const saveDb = db => store().setJSON('db', db);
 
 /* unbroken check-in streak ending today/yesterday (how Google counts the 14 days) */
 function streak(m) {
@@ -36,17 +36,64 @@ function streak(m) {
   return run;
 }
 
-/* e-mails are visible only to their owner and to the master admin */
-function publicView(db, email) {
-  const master = email === MASTER;
+/* dead matches no longer clog the owner's dashboard and the tester count */
+function sweepAbandoned(db) {
+  let changed = false;
+  for (const m of db.matches) {
+    if (m.status !== 'active') continue;
+    if (m.started) {
+      const last = m.checkins.length ? [...m.checkins.map(c => c.date)].sort().pop() : m.started;
+      if (daysDiff(last, today()) > ABANDON_AFTER_DAYS) { m.status = 'abandoned'; changed = true; }
+    } else if (daysDiff(m.accepted, today()) > STALE_ACCEPT_DAYS) {
+      m.status = 'abandoned'; changed = true;
+    }
+  }
+  return changed;
+}
+
+async function loadDb() {
+  let db = await store().get('db', { type: 'json' });
+  let dirty = false;
+  if (!db || !Array.isArray(db.users)) { db = { users: [], apps: [], matches: [] }; dirty = true; }
+  // founder #1 — platform owner is always the first registered account
+  if (!db.users.some(u => u.email === MASTER)) {
+    db.users.unshift({ id: 'founder-001', nick: 'Kawalko34', email: MASTER, founder: true, createdAt: '2026-07-06', google: true, demo: false, tokens: [] });
+    dirty = true;
+  }
+  if (sweepAbandoned(db)) dirty = true;
+  if (dirty) await store().setJSON('db', db);
+  return db;
+}
+const saveDb = db => store().setJSON('db', db);
+
+async function verifyGoogleToken(idToken, email) {
+  if (!idToken) return false;
+  try {
+    const r = await fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken));
+    if (!r.ok) return false;
+    const j = await r.json();
+    return j.aud === GOOGLE_CLIENT_ID && String(j.email || '').toLowerCase() === email && j.email_verified === 'true';
+  } catch (e) { return false; }
+}
+
+function issueToken(u) {
+  const tk = token();
+  u.tokens = (u.tokens || []).slice(-4);
+  u.tokens.push(tk);
+  return tk;
+}
+
+/* e-mails are visible only to their (authenticated) owner and to the master admin */
+function publicView(db, email, authed) {
+  const master = authed && email === MASTER;
   return {
     users: db.users.map(u => ({
       id: u.id, nick: u.nick, founder: u.founder, createdAt: u.createdAt,
       google: !!u.google, demo: !!u.demo,
-      email: (master || u.email === email) ? u.email : undefined
+      email: (master || (authed && u.email === email)) ? u.email : undefined
     })),
     apps: db.apps,
-    matches: db.matches
+    matches: db.matches.map(m => ({ ...m })) // tokens never live on matches; users mapped above
   };
 }
 
@@ -68,27 +115,40 @@ export default async (req) => {
   try {
     const db = await loadDb();
     const me = db.users.find(u => u.email === email);
+    const authed = !!(me && body.token && Array.isArray(me.tokens) && me.tokens.includes(body.token));
 
-    if (op === 'state') return json({ ok: true, meId: me ? me.id : null, db: publicView(db, email) });
+    if (op === 'state') return json({ ok: true, meId: authed ? me.id : null, db: publicView(db, email, authed) });
 
     if (op === 'register') {
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ ok: false, err: 'email' });
       let u = db.users.find(x => x.email === email);
-      if (!u) {
-        const nick = String(body.nick || '').trim().slice(0, 24);
-        if (nick.length < 3) return json({ ok: false, err: 'nick' });
-        if (db.users.some(x => x.nick.toLowerCase() === nick.toLowerCase())) return json({ ok: false, err: 'nickTaken' });
-        u = { id: uid(), nick, email, founder: db.users.length < FREE_LIMIT, createdAt: today(), google: !!body.google, picture: body.picture || null, demo: false };
-        db.users.push(u);
+      if (u) {
+        // sign-in to an existing account: Google-linked accounts require a verified Google token
+        if (u.google && !(await verifyGoogleToken(body.idToken, email))) return json({ ok: false, err: 'needGoogle' });
+        if (body.google && body.idToken && await verifyGoogleToken(body.idToken, email)) { u.google = true; if (body.picture) u.picture = body.picture; }
+        const tk = issueToken(u);
         await saveDb(db);
-      } else if (body.google) {
-        u.google = true; if (body.picture) u.picture = body.picture;
-        await saveDb(db);
+        return json({ ok: true, meId: u.id, token: tk, db: publicView(db, email, true) });
       }
-      return json({ ok: true, meId: u.id, db: publicView(db, email) });
+      const nick = String(body.nick || '').trim().slice(0, 24);
+      if (nick.length < 3) return json({ ok: false, err: 'nick' });
+      if (db.users.some(x => x.nick.toLowerCase() === nick.toLowerCase())) return json({ ok: false, err: 'nickTaken' });
+      const isGoogle = !!(body.google && await verifyGoogleToken(body.idToken, email));
+      u = { id: uid(), nick, email, founder: db.users.length < FREE_LIMIT, createdAt: today(), google: isGoogle, picture: body.picture || null, demo: false, tokens: [] };
+      const tk = issueToken(u);
+      db.users.push(u);
+      await saveDb(db);
+      return json({ ok: true, meId: u.id, token: tk, db: publicView(db, email, true) });
     }
 
-    if (!me) return json({ ok: false, err: 'auth' }, 401);
+    if (op === 'adminWipe') { // master only, guarded by ADMIN_KEY env var (key IS the credential)
+      if (email !== MASTER || !process.env.ADMIN_KEY || body.key !== process.env.ADMIN_KEY) return json({ ok: false, err: 'auth' }, 403);
+      await store().setJSON('db', { users: [], apps: [], matches: [] });
+      const fresh = await loadDb();
+      return json({ ok: true, db: publicView(fresh, email, false) });
+    }
+
+    if (!authed) return json({ ok: false, err: 'auth' }, 401);
 
     if (op === 'addApp') {
       const title = String(body.title || '').trim();
@@ -122,19 +182,23 @@ export default async (req) => {
       const note = String(body.note || '').trim();
       if (note.length < 10) return json({ ok: false, err: 'note' });
       if (!body.screenshot) return json({ ok: false, err: 'shot' });
+      const day = effectiveDay(body.localDate);
       await store().set('shot-' + m.id, String(body.screenshot).slice(0, 400000));
       m.hasShot = true;
-      m.started = today();
+      m.started = day;
+      m.status = 'active';
       if (body.device) m.device = body.device;
-      if (!m.checkins.some(c => c.date === today())) m.checkins.push({ date: today(), note: note.slice(0, 500) });
+      if (!m.checkins.some(c => c.date === day)) m.checkins.push({ date: day, note: note.slice(0, 500) });
     }
     else if (op === 'checkin') {
       const m = db.matches.find(m => m.id === body.matchId && m.testerId === me.id);
       if (!m) return json({ ok: false, err: 'match' });
-      if (m.checkins.some(c => c.date === today())) return json({ ok: false, err: 'dup' });
+      const day = effectiveDay(body.localDate);
+      if (m.checkins.some(c => c.date === day)) return json({ ok: false, err: 'dup' });
       const note = String(body.note || '').trim();
       if (note.length < 10) return json({ ok: false, err: 'note' });
-      m.checkins.push({ date: today(), note: note.slice(0, 500) });
+      m.checkins.push({ date: day, note: note.slice(0, 500) });
+      m.status = 'active'; // a returning tester revives an abandoned match
     }
     else if (op === 'survey') {
       const m = db.matches.find(m => m.id === body.matchId && m.testerId === me.id);
@@ -154,16 +218,10 @@ export default async (req) => {
       const data = await store().get('shot-' + m.id);
       return json({ ok: true, screenshot: data || null });
     }
-    else if (op === 'adminWipe') { // master only, guarded by ADMIN_KEY env var
-      if (email !== MASTER || !process.env.ADMIN_KEY || body.key !== process.env.ADMIN_KEY) return json({ ok: false, err: 'auth' }, 403);
-      await store().setJSON('db', { users: [], apps: [], matches: [] });
-      const fresh = await loadDb();
-      return json({ ok: true, db: publicView(fresh, email) });
-    }
     else return json({ ok: false, err: 'op' }, 400);
 
     await saveDb(db);
-    return json({ ok: true, meId: me.id, db: publicView(db, email) });
+    return json({ ok: true, meId: me.id, db: publicView(db, email, true) });
   } catch (e) {
     return json({ ok: false, err: 'server: ' + String(e && e.message || e) }, 500);
   }
