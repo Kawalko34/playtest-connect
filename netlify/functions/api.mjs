@@ -60,6 +60,11 @@ async function loadDb() {
     db.users.unshift({ id: 'founder-001', nick: 'Kawalko34', email: MASTER, founder: true, createdAt: '2026-07-06', google: true, demo: false, tokens: [] });
     dirty = true;
   }
+  // first game on the exchange — the owner's own app (com.arek.datenight)
+  if (!db.apps.some(a => a.link.endsWith('com.arek.datenight'))) {
+    db.apps.unshift({ id: 'app-001', ownerId: 'founder-001', title: 'Date Night game', desc: 'Couples party game — test the menu, card decks and daily flow. Android 12+.', link: 'https://play.google.com/apps/testing/com.arek.datenight', status: 'searching', createdAt: '2026-07-06' });
+    dirty = true;
+  }
   if (sweepAbandoned(db)) dirty = true;
   if (dirty) await store().setJSON('db', db);
   return db;
