@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PlayTest Connect — Google Play Closed Testing Exchange</title>
+<title>Play Test — Google Play Closed Testing Exchange</title>
 <style>
 :root{
   --bg:#0F1117; --card:#1A1D27; --card2:#222636; --border:#2A2F42;
@@ -108,7 +108,7 @@ td{padding:9px 10px;border-bottom:1px solid var(--border)}
 <script src="https://accounts.google.com/gsi/client" async defer onload="maybeInitGoogle()"></script>
 <script>
 /* ============================================================
-   PlayTest Connect — MVP (local / offline-first mode)
+   Play Test — MVP (local / offline-first mode)
    Data: localStorage + JSON export/import (sync via OneDrive)
    Phase 2: swap the store layer for Supabase (supabase-schema.sql)
    Language: English (default) + Polish, switchable
@@ -225,7 +225,7 @@ en:{
   demoBtn:'Load sample data',demoLoaded:'🧪 Sample data loaded ({n} developers, games on the exchange).',
   dangerTitle:'⚠️ Danger zone',resetBtn:'Reset the whole app',resetConfirm:'Are you sure? This deletes ALL local data.',
   logout:'Sign out',
-  footer:'PlayTest Connect v0.1 MVP · Terms: this platform is for honest test exchange only. Forbidden: emulators, bots, account farms and soliciting Play Store ratings/reviews. Violation = ban and loss of points.',
+  footer:'Play Test v0.1 MVP · Terms: this platform is for honest test exchange only. Forbidden: emulators, bots, account farms and soliciting Play Store ratings/reviews. Violation = ban and loss of points.',
   exported:'Database exported — save the file in your OneDrive folder.',
   imported:'Database imported.',importBad:'Invalid database file.',
   vNick:'The nickname needs at least 3 characters.',vEmail:'Enter a valid e-mail address.',
@@ -338,7 +338,7 @@ pl:{
   demoBtn:'Wczytaj dane przykładowe',demoLoaded:'🧪 Dane przykładowe wczytane ({n} deweloperów, gry na giełdzie).',
   dangerTitle:'⚠️ Strefa niebezpieczna',resetBtn:'Wyzeruj całą aplikację',resetConfirm:'Na pewno? To usunie WSZYSTKIE dane lokalne.',
   logout:'Wyloguj',
-  footer:'PlayTest Connect v0.1 MVP · Regulamin: platforma służy wyłącznie uczciwej wymianie testów. Zakazane: emulatory, boty, farmy kont oraz wymuszanie ocen/recenzji w Sklepie Play. Naruszenie = ban i utrata punktów.',
+  footer:'Play Test v0.1 MVP · Regulamin: platforma służy wyłącznie uczciwej wymianie testów. Zakazane: emulatory, boty, farmy kont oraz wymuszanie ocen/recenzji w Sklepie Play. Naruszenie = ban i utrata punktów.',
   exported:'Baza wyeksportowana — zapisz plik w folderze OneDrive.',
   imported:'Baza zaimportowana.',importBad:'Nieprawidłowy plik bazy.',
   vNick:'Nick musi mieć min. 3 znaki.',vEmail:'Podaj prawidłowy e-mail.',
@@ -472,7 +472,7 @@ function render(){
   root.innerHTML=`
   <div id="layout">
     <div id="sidebar">
-      <div class="logo">▶ PlayTest <span>Connect</span></div>
+      <div class="logo">▶ Play <span>Test</span></div>
       ${VIEW_KEYS.filter(k=>k!=='admin'||isMaster()).map(k=>{const lbl=t('nav_'+k);return `<button class="navbtn ${view===k?'active':''}" onclick="nav('${k}')"><span>${lbl.split(' ')[0]}</span><span class="lbl">${lbl.split(' ').slice(1).join(' ')}</span></button>`;}).join('')}
       ${langSwitcher()}
       <div class="bottom">${t('signedAs')}: <b>${esc(nick)}</b><br>${t('localMode')}</div>
@@ -487,7 +487,7 @@ function registerView(){
   return `<div id="registerView">
     <div style="display:flex;justify-content:flex-end">${langSwitcher()}</div>
     <div style="text-align:center;margin-bottom:26px">
-      <div style="font-size:34px;font-weight:800">▶ PlayTest <span style="color:var(--accent)">Connect</span></div>
+      <div style="font-size:34px;font-weight:800">▶ Play <span style="color:var(--accent)">Test</span></div>
       <div class="muted" style="margin-top:6px">${t('tagline')}</div>
     </div>
     <div class="founderBanner">${t('founderLeft',{n:left,max:FREE_LIMIT})}${left===0?' <span class="badge amber">'+t('founderGone')+'</span>':''}</div>
