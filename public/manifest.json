@@ -1,0 +1,14 @@
+{
+  "name": "Play Test",
+  "short_name": "Play Test",
+  "description": "Google Play closed-testing exchange — 14 testers × 14 days",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F1117",
+  "theme_color": "#0F1117",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "192x192", "type": "image/svg+xml" },
+    { "src": "/icon.svg", "sizes": "512x512", "type": "image/svg+xml" }
+  ]
+}

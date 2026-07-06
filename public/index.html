@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0F1117">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
 <title>Play Test — Google Play Closed Testing Exchange</title>
 <style>
 :root{
@@ -98,28 +101,29 @@ td{padding:9px 10px;border-bottom:1px solid var(--border)}
 .bar-chart>div{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;position:relative}
 .bar-chart>div span{position:absolute;bottom:-18px;left:0;right:0;text-align:center;font-size:10px;color:var(--muted)}
 .appicon{width:44px;height:44px;border-radius:10px;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+#loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:16px}
+.spinner{width:44px;height:44px;border-radius:50%;border:4px solid var(--card2);border-top-color:var(--accent);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
-<div id="root"></div>
+<div id="root"><div id="loading"><div class="spinner"></div><div class="muted" id="loadTxt">Loading…</div></div></div>
 <div id="modalWrap"><div id="modalBox"></div></div>
 <div id="toast"></div>
 
 <script src="https://accounts.google.com/gsi/client" async defer onload="maybeInitGoogle()"></script>
 <script>
 /* ============================================================
-   Play Test — MVP (local / offline-first mode)
-   Data: localStorage + JSON export/import (sync via OneDrive)
-   Phase 2: swap the store layer for Supabase (supabase-schema.sql)
-   Language: English (default) + Polish, switchable
+   Play Test — PHASE 2: shared cloud database for everyone
+   Backend: Netlify Function (/api) + Netlify Blobs
+   Session (who am I) + language live in this browser only.
    ============================================================ */
-const LS_KEY='ptc_state_v1';
 const FREE_LIMIT=100, GOOGLE_MIN_TESTERS=12, TARGET_TESTERS=14, REQUIRED_DAYS=14;
-/* Master admin — the platform owner's account (full admin access, no PIN) */
+const MIN_ANDROID=12; /* "Android above 11" = 12+ */
 const MASTER_ADMIN_EMAIL='kawalko334411@gmail.com';
-/* Google OAuth Client ID (Google Cloud Console → Google Auth Platform → Clients).
-   Can be overridden in ⚙️ Settings. */
 const DEFAULT_GOOGLE_CLIENT_ID='832482048394-0be28ltmam33msagi9srk0hmrs0juctq.apps.googleusercontent.com';
+const SITE='https://playtest-connect.netlify.app';
+const API_BASE=(location.hostname.endsWith('netlify.app')||location.port==='8888')?'/api':SITE+'/api';
 
 /* ---------- I18N — English default, Polish secondary ---------- */
 const T={
@@ -130,7 +134,7 @@ en:{
   registered:'🎉 Registered: <b>{n}</b> · <b>{left} of {max}</b> free Founder accounts left',
   signTitle:'Create an account or sign in',
   orEmail:'— or with e-mail —',
-  googleOff:'🔑 Google sign-in inactive — paste an OAuth Client ID in ⚙️ Settings or in the <code>DEFAULT_GOOGLE_CLIENT_ID</code> constant.',
+  googleOff:'🔑 Google sign-in inactive.',
   nick:'Nickname (publicly visible)',nickPh:'e.g. IndieDevBerlin',
   email:'E-mail (Google — 1 account = 1 user)',
   declDevice:'I declare that I test on a <b>physical Android device</b> (not an emulator).',
@@ -138,7 +142,7 @@ en:{
   registerBtn:'Sign up',registerFree:'— free (Founder)',
   accountNo:'Account #{n} · After the first {max} accounts: $3.99/mo, cancel anytime.',
   nav_dashboard:'🏠 Dashboard',nav_myapps:'🎮 My games',nav_exchange:'🔄 Test exchange',nav_mytests:'✅ My tests',nav_reputation:'⭐ Reputation',nav_admin:'🔐 Admin',nav_settings:'⚙️ Settings',
-  signedAs:'Signed in as',localMode:'Local mode (MVP)',
+  signedAs:'Signed in as',cloudMode:'☁️ Shared cloud database',
   dashTitle:'Dashboard',hello:'Hello, {n}!',founderBadge:'⭐ Founder',
   statMyApps:'My games in testing',statTesting:'Games I test',statPoints:'My Tester Points',
   todayTitle:'To test today ({n})',todayEmpty:'Nothing to do — all of today’s check-ins are done. 💪',
@@ -152,6 +156,7 @@ en:{
   myappsTitle:'My games',myappsSub:'Add a game and list it on the test exchange.',
   addGame:'＋ Add a new game',noGames:'No games yet. Click “Add a new game”.',
   publish:'📢 Find testers',del:'Delete',
+  shareBtn:'🔗 Invite link',copied:'Invite link copied — send it to testers! Anyone who opens it joins your test automatically.',
   addTitle:'Add a game',gameTitle:'Game title',gameTitlePh:'e.g. Neon Runner',
   gameDesc:'Short description (what to test?)',gameDescPh:'e.g. 2D platformer — check levels 1–5, the shop and ads',
   optinLink:'Opt-in link from Google Play Console',
@@ -159,11 +164,12 @@ en:{
   save:'Save game',cancel:'Cancel',
   vTitle:'Enter a game title.',vLink:'The link must match https://play.google.com/apps/testing/... (opt-in link from Play Console).',
   savedDraft:'Game saved as draft.',published:'📢 Game listed on the test exchange!',
-  cantDelete:'Cannot delete — the game has active testers.',
+  cantDelete:'Cannot delete — the game has active testers.',nickTaken:'This nickname is already taken.',
   exTitle:'Test exchange',exSub:'Accept a challenge — test someone’s game, earn Tester Points and build reputation. Authors return the favour by testing your game.',
-  exEmpty:'No games available on the exchange. Check back later or load sample data in ⚙️ Settings.',
+  exEmpty:'No games available on the exchange right now. Check back later!',
   accept:'🎯 Accept test challenge',author:'author',trust:'Trust',
   acceptedTitle:'🎯 Challenge accepted!',optinFor:'Here is the opt-in link for <b>{a}</b>:',
+  openPlay:'▶ Open in Google Play',
   steps:'<li>Open the link on a <b>physical Android phone</b> and join the test.</li><li>Download the game from the Play Store and <b>launch it</b>.</li><li>Come back here (✅ My tests) and click “Downloaded &amp; launched” — your 14-day timer starts.</li>',
   warn14:'⚠️ Remember: the 14 days must be <b>continuous</b>. A daily check-in = 1 click + 1 sentence. A 2-day gap resets the timer!',
   goMyTests:'Go to My tests',
@@ -201,40 +207,48 @@ en:{
   bFinisher:'🏆 Finisher',bPro:'💎 Pro Tester',
   howTrust:'How does the Trust Score grow?',
   howTrustList:'<li>+12 for every completed full 14-day cycle</li><li>+1 for each day of your current check-in streak</li><li>+4 for every filled survey (day 7/14)</li><li><span style="color:var(--danger)">−15 for an abandoned test</span> (gap with no return)</li>',
-  admTitle:'🔐 Admin panel',admFirst:'First run — set the owner PIN.',
-  newPin:'New PIN (4–8 digits)',setPin:'Set PIN',admOnly:'Owner access only.',pin:'PIN',unlock:'Unlock',
-  vPin:'PIN: 4–8 digits.',pinSet:'PIN set.',pinBad:'Wrong PIN.',
-  admSub:'Registrations control and the “First 100” model.',
+  admTitle:'🔐 Admin panel',
+  admSub:'Registrations control and the “First 100” model. Live data — refreshes automatically.',
   admTotal:'Total registered',admFree:'Free Founder slots',admSubs:'Future subscribers ($3.99/mo)',
   admChart:'Registration growth (recent days)',admList:'Accounts ({n})',
   colNo:'#',colNick:'Nickname',colEmail:'E-mail',colDate:'Date',colStatus:'Status',colTrust:'Trust',
   stFounder:'Founder',stPaid:'$3.99/mo',
   admPay:'💳 Payment integration is intentionally <b>disabled</b> in the MVP — accounts 101+ only see an informational subscription screen. The gateway (Stripe) comes in phase 2 on your command.',
-  setTitle:'Settings',setSub:'Data, sync and developer tools.',
+  setTitle:'Settings',setSub:'Language, app install and your data.',
   langTitle:'🌐 Language',
-  dbTitle:'💾 Database (local mode)',
-  dbInfo:'Data is stored locally. Export the JSON file to your OneDrive/Google Drive folder for backup and manual sync between computers. Phase 2: shared backend (Supabase) — schema ready in <code>supabase-schema.sql</code>.',
-  exportBtn:'⬇ Export database (JSON)',importBtn:'⬆ Import database',
+  installTitle:'📲 Install on your phone',
+  installInfo:'Install Play Test as an app on your home screen — it opens full-screen like a native app.',
+  installBtn:'📲 Install app',installed:'App installed! Find it on your home screen.',
+  installHint:'On Android Chrome: menu ⋮ → “Add to home screen”.',
+  dbTitle:'💾 Your data',
+  dbInfo:'All data lives in a shared cloud database — everyone sees the same games and progress in real time. You can download a backup of the current state below.',
+  exportBtn:'⬇ Download backup (JSON)',
   gTitle:'🔑 Google sign-in',
-  gInfo:'Paste an OAuth Client ID (Google Cloud Console → Google Auth Platform → Clients → web application). “Authorized JavaScript origins” must include the address you open the app from (e.g. <code>http://localhost:8377</code>). Note: Google sign-in does not work from <code>file://</code> — only http/https.',
+  gInfo:'Sign-in is configured platform-wide. Advanced: override the OAuth Client ID for this browser only.',
   gSaveBtn:'Save Client ID',
-  gSaved:'Client ID saved — the Google button is active on the sign-in screen.',gRemoved:'Client ID removed.',
+  gSaved:'Client ID saved.',gRemoved:'Client ID override removed.',
   gBad:'The Client ID should end with .apps.googleusercontent.com',
-  demoTitle:'🧪 Sample data',
-  demoInfo:'Load sample developers and games to see the exchange, dashboard and admin in action.',
-  demoBtn:'Load sample data',demoLoaded:'🧪 Sample data loaded ({n} developers, games on the exchange).',
-  dangerTitle:'⚠️ Danger zone',resetBtn:'Reset the whole app',resetConfirm:'Are you sure? This deletes ALL local data.',
-  logout:'Sign out',
-  footer:'Play Test v0.1 MVP · Terms: this platform is for honest test exchange only. Forbidden: emulators, bots, account farms and soliciting Play Store ratings/reviews. Violation = ban and loss of points.',
-  exported:'Database exported — save the file in your OneDrive folder.',
-  imported:'Database imported.',importBad:'Invalid database file.',
+  dangerTitle:'⚠️ Account',logout:'Sign out',
+  footer:'Play Test v0.2 · Terms: this platform is for honest test exchange only. Forbidden: emulators, bots, account farms and soliciting Play Store ratings/reviews. Violation = ban and loss of points.',
+  exported:'Backup downloaded.',
   vNick:'The nickname needs at least 3 characters.',vEmail:'Enter a valid e-mail address.',
   vBoth:'Tick both declarations.',
   welcomeBack:'👋 Welcome back, {n}!',
   welcomeFounder:'🎉 Welcome, Founder! Your account is free forever.',created:'Account created.',
   gReadErr:'Could not read your Google data.',gNoMail:'Google account without a verified e-mail.',
   finishTitle:'Finish signing up',createAcc:'Create account',
-  optinLinkLbl:'Opt-in link'
+  optinLinkLbl:'Opt-in link',
+  netErr:'Connection problem — check your internet and try again.',
+  loading:'Loading…',
+  inviteTitle:'🎮 You’ve been invited to test:',
+  inviteJoin:'Sign in above and you will join this test automatically.',
+  androidBlockT:'❌ Android too old',
+  androidBlock:'This platform requires <b>Android {min} or newer</b> (above 11). Your device: <b>Android {v}</b>. Please use a newer phone.',
+  androidWarnT:'⚠️ Not an Android phone',
+  androidWarn:'You seem to be on a computer or non-Android device. You can accept the challenge here, but the actual testing must happen on an <b>Android {min}+ phone</b> — open this site there.',
+  androidOk:'✅ Android {v} — your device qualifies (Android above 11 required).',
+  continueBtn:'I understand — continue',
+  deviceLbl:'Device',autoJoined:'🎯 You were automatically signed up to test “{a}”!'
 },
 pl:{
   tagline:'Wymiana testów zamkniętych Google Play — 14 testerów × 14 dni, bez stresu.',
@@ -243,7 +257,7 @@ pl:{
   registered:'🎉 Zarejestrowanych: <b>{n}</b> · Zostało <b>{left} ze {max}</b> darmowych kont Założyciela',
   signTitle:'Załóż konto lub zaloguj się',
   orEmail:'— albo przez e-mail —',
-  googleOff:'🔑 Logowanie Google nieaktywne — wklej OAuth Client ID w ⚙️ Ustawieniach lub w stałej <code>DEFAULT_GOOGLE_CLIENT_ID</code>.',
+  googleOff:'🔑 Logowanie Google nieaktywne.',
   nick:'Nick (widoczny publicznie)',nickPh:'np. IndieDevKrakow',
   email:'E-mail (Google — 1 konto = 1 użytkownik)',
   declDevice:'Oświadczam, że testuję na <b>fizycznym urządzeniu Android</b> (nie na emulatorze).',
@@ -251,7 +265,7 @@ pl:{
   registerBtn:'Zarejestruj się',registerFree:'— za darmo (Założyciel)',
   accountNo:'Konto #{n} · Po {max} pierwszych kontach: 3,99 USD/mies., rezygnacja w każdej chwili.',
   nav_dashboard:'🏠 Panel',nav_myapps:'🎮 Moje gry',nav_exchange:'🔄 Giełda testów',nav_mytests:'✅ Moje testy',nav_reputation:'⭐ Reputacja',nav_admin:'🔐 Admin',nav_settings:'⚙️ Ustawienia',
-  signedAs:'Zalogowany',localMode:'Tryb lokalny (MVP)',
+  signedAs:'Zalogowany',cloudMode:'☁️ Wspólna baza w chmurze',
   dashTitle:'Panel główny',hello:'Dzień dobry, {n}!',founderBadge:'⭐ Założyciel',
   statMyApps:'Moje gry w testach',statTesting:'Gry, które testuję',statPoints:'Moje Punkty Testera',
   todayTitle:'Do przetestowania dzisiaj ({n})',todayEmpty:'Nic do zrobienia — wszystkie dzisiejsze check-iny zaliczone. 💪',
@@ -265,6 +279,7 @@ pl:{
   myappsTitle:'Moje gry',myappsSub:'Dodaj grę i wystaw ją na giełdę wymiany testów.',
   addGame:'＋ Dodaj nową grę',noGames:'Brak gier. Kliknij „Dodaj nową grę".',
   publish:'📢 Szukam testerów',del:'Usuń',
+  shareBtn:'🔗 Link zaproszenia',copied:'Link skopiowany — wyślij testerom! Kto go otworzy, automatycznie dołącza do Twojego testu.',
   addTitle:'Dodaj grę',gameTitle:'Tytuł gry',gameTitlePh:'np. Neon Runner',
   gameDesc:'Krótki opis (co testować?)',gameDescPh:'np. platformówka 2D — sprawdź poziomy 1–5, sklep i reklamy',
   optinLink:'Link opt-in z Google Play Console',
@@ -272,11 +287,12 @@ pl:{
   save:'Zapisz grę',cancel:'Anuluj',
   vTitle:'Podaj tytuł gry.',vLink:'Link musi mieć format https://play.google.com/apps/testing/... (link opt-in z Play Console).',
   savedDraft:'Gra zapisana jako szkic.',published:'📢 Gra wystawiona na giełdę testów!',
-  cantDelete:'Nie można usunąć — gra ma aktywnych testerów.',
+  cantDelete:'Nie można usunąć — gra ma aktywnych testerów.',nickTaken:'Ten nick jest już zajęty.',
   exTitle:'Giełda testów',exSub:'Przyjmij wyzwanie — testuj cudzą grę, zdobywaj Punkty Testera i buduj reputację. Autorzy odwdzięczają się testem Twojej gry.',
-  exEmpty:'Brak dostępnych gier na giełdzie. Zajrzyj później lub wczytaj dane przykładowe w ⚙️ Ustawieniach.',
+  exEmpty:'Brak dostępnych gier na giełdzie. Zajrzyj później!',
   accept:'🎯 Przyjmij wyzwanie testowe',author:'autor:',trust:'Trust',
   acceptedTitle:'🎯 Wyzwanie przyjęte!',optinFor:'Oto link opt-in do gry <b>{a}</b>:',
+  openPlay:'▶ Otwórz w Google Play',
   steps:'<li>Otwórz link na <b>fizycznym telefonie Android</b> i dołącz do testu.</li><li>Pobierz grę ze Sklepu Play i <b>uruchom ją</b>.</li><li>Wróć tutaj (✅ Moje testy) i kliknij „Pobrałem i uruchomiłem" — wystartuje Twój licznik 14 dni.</li>',
   warn14:'⚠️ Pamiętaj: 14 dni musi być <b>ciągłe</b>. Codzienny check-in = 1 klik + 1 zdanie. Przerwa 2 dni zeruje licznik!',
   goMyTests:'Przejdź do Moich testów',
@@ -314,61 +330,79 @@ pl:{
   bFinisher:'🏆 Finisher',bPro:'💎 Pro Tester',
   howTrust:'Jak rośnie Trust Score?',
   howTrustList:'<li>+12 za każdy ukończony pełny cykl 14 dni</li><li>+1 za każdy dzień bieżącej serii check-inów</li><li>+4 za każdą wypełnioną ankietę (dzień 7/14)</li><li><span style="color:var(--danger)">−15 za porzucony test</span> (przerwa i brak powrotu)</li>',
-  admTitle:'🔐 Panel administratora',admFirst:'Pierwsze uruchomienie — ustaw PIN właściciela.',
-  newPin:'Nowy PIN (4–8 cyfr)',setPin:'Ustaw PIN',admOnly:'Dostęp tylko dla właściciela platformy.',pin:'PIN',unlock:'Odblokuj',
-  vPin:'PIN: 4–8 cyfr.',pinSet:'PIN ustawiony.',pinBad:'Błędny PIN.',
-  admSub:'Kontrola rejestracji i modelu „Pierwsze 100".',
+  admTitle:'🔐 Panel administratora',
+  admSub:'Kontrola rejestracji i modelu „Pierwsze 100". Dane na żywo — odświeżają się automatycznie.',
   admTotal:'Zarejestrowanych łącznie',admFree:'Wolne konta Założyciela',admSubs:'Przyszli subskrybenci (3,99$/mies.)',
   admChart:'Przyrost rejestracji (ostatnie dni)',admList:'Lista kont ({n})',
   colNo:'#',colNick:'Nick',colEmail:'E-mail',colDate:'Data',colStatus:'Status',colTrust:'Trust',
   stFounder:'Założyciel',stPaid:'3,99$/mies.',
   admPay:'💳 Integracja płatności celowo <b>wyłączona</b> w MVP — konta 101+ widzą tylko ekran informacyjny o subskrypcji. Bramkę (Stripe) dodamy w fazie 2 na Twoje polecenie.',
-  setTitle:'Ustawienia',setSub:'Dane, synchronizacja i narzędzia deweloperskie.',
+  setTitle:'Ustawienia',setSub:'Język, instalacja aplikacji i Twoje dane.',
   langTitle:'🌐 Język',
-  dbTitle:'💾 Baza danych (tryb lokalny)',
-  dbInfo:'Dane trzymane są lokalnie. Eksportuj plik JSON do folderu OneDrive/Google Drive, aby mieć kopię i ręczną synchronizację między komputerami. Faza 2: wspólny backend (Supabase) — schemat gotowy w pliku <code>supabase-schema.sql</code>.',
-  exportBtn:'⬇ Eksportuj bazę (JSON)',importBtn:'⬆ Importuj bazę',
+  installTitle:'📲 Zainstaluj na telefonie',
+  installInfo:'Zainstaluj Play Test jako aplikację na ekranie głównym — otwiera się na pełnym ekranie jak natywna appka.',
+  installBtn:'📲 Zainstaluj aplikację',installed:'Aplikacja zainstalowana! Znajdziesz ją na ekranie głównym.',
+  installHint:'Na Androidzie w Chrome: menu ⋮ → „Dodaj do ekranu głównego".',
+  dbTitle:'💾 Twoje dane',
+  dbInfo:'Wszystkie dane są we wspólnej bazie w chmurze — każdy widzi te same gry i postępy na żywo. Poniżej możesz pobrać kopię zapasową aktualnego stanu.',
+  exportBtn:'⬇ Pobierz kopię (JSON)',
   gTitle:'🔑 Logowanie przez Google',
-  gInfo:'Wklej OAuth Client ID (Google Cloud Console → Google Auth Platform → Klienci → aplikacja internetowa). W polu „Autoryzowane źródła JavaScript" musi być adres, z którego otwierasz appkę (np. <code>http://localhost:8377</code>). Uwaga: logowanie Google nie działa z pliku <code>file://</code> — tylko przez http/https.',
+  gInfo:'Logowanie jest skonfigurowane globalnie. Zaawansowane: nadpisz OAuth Client ID tylko dla tej przeglądarki.',
   gSaveBtn:'Zapisz Client ID',
-  gSaved:'Client ID zapisany — przycisk Google aktywny na ekranie logowania.',gRemoved:'Client ID usunięty.',
+  gSaved:'Client ID zapisany.',gRemoved:'Nadpisanie Client ID usunięte.',
   gBad:'Client ID powinien kończyć się na .apps.googleusercontent.com',
-  demoTitle:'🧪 Dane przykładowe',
-  demoInfo:'Wczytaj przykładowych deweloperów i gry, żeby zobaczyć giełdę, panel i admin w akcji.',
-  demoBtn:'Wczytaj dane przykładowe',demoLoaded:'🧪 Dane przykładowe wczytane ({n} deweloperów, gry na giełdzie).',
-  dangerTitle:'⚠️ Strefa niebezpieczna',resetBtn:'Wyzeruj całą aplikację',resetConfirm:'Na pewno? To usunie WSZYSTKIE dane lokalne.',
-  logout:'Wyloguj',
-  footer:'Play Test v0.1 MVP · Regulamin: platforma służy wyłącznie uczciwej wymianie testów. Zakazane: emulatory, boty, farmy kont oraz wymuszanie ocen/recenzji w Sklepie Play. Naruszenie = ban i utrata punktów.',
-  exported:'Baza wyeksportowana — zapisz plik w folderze OneDrive.',
-  imported:'Baza zaimportowana.',importBad:'Nieprawidłowy plik bazy.',
+  dangerTitle:'⚠️ Konto',logout:'Wyloguj',
+  footer:'Play Test v0.2 · Regulamin: platforma służy wyłącznie uczciwej wymianie testów. Zakazane: emulatory, boty, farmy kont oraz wymuszanie ocen/recenzji w Sklepie Play. Naruszenie = ban i utrata punktów.',
+  exported:'Kopia pobrana.',
   vNick:'Nick musi mieć min. 3 znaki.',vEmail:'Podaj prawidłowy e-mail.',
   vBoth:'Zaznacz oba oświadczenia.',
   welcomeBack:'👋 Witaj ponownie, {n}!',
   welcomeFounder:'🎉 Witaj, Założycielu! Konto darmowe na zawsze.',created:'Konto utworzone.',
   gReadErr:'Nie udało się odczytać danych Google.',gNoMail:'Konto Google bez zweryfikowanego e-maila.',
   finishTitle:'Dokończ rejestrację',createAcc:'Utwórz konto',
-  optinLinkLbl:'Link opt-in'
+  optinLinkLbl:'Link opt-in',
+  netErr:'Problem z połączeniem — sprawdź internet i spróbuj ponownie.',
+  loading:'Wczytywanie…',
+  inviteTitle:'🎮 Zaproszono Cię do testowania:',
+  inviteJoin:'Zaloguj się powyżej, a automatycznie dołączysz do tego testu.',
+  androidBlockT:'❌ Za stary Android',
+  androidBlock:'Ta platforma wymaga <b>Androida {min} lub nowszego</b> (powyżej 11). Twoje urządzenie: <b>Android {v}</b>. Użyj nowszego telefonu.',
+  androidWarnT:'⚠️ To nie jest telefon z Androidem',
+  androidWarn:'Wygląda na to, że jesteś na komputerze lub urządzeniu bez Androida. Możesz tu przyjąć wyzwanie, ale samo testowanie musi odbywać się na <b>telefonie z Androidem {min}+</b> — otwórz tam tę stronę.',
+  androidOk:'✅ Android {v} — Twoje urządzenie spełnia wymóg (Android powyżej 11).',
+  continueBtn:'Rozumiem — kontynuuj',
+  deviceLbl:'Urządzenie',autoJoined:'🎯 Zostałeś automatycznie zapisany do testowania „{a}"!'
 }};
-let S=loadState();
-let LANG=S.lang||'en';
-function t(k,vars){let s=(T[LANG][k]!==undefined?T[LANG][k]:T.en[k])||k;if(vars)Object.entries(vars).forEach(([kk,v])=>{s=s.split('{'+kk+'}').join(v);});return s;}
-function setLang(l){LANG=l;S.lang=l;save();document.documentElement.lang=l;render();}
 
-function defaultState(){return{version:1,me:null,adminPin:null,lang:'en',users:[],apps:[],matches:[]};}
-function loadState(){try{const raw=localStorage.getItem(LS_KEY);return raw?JSON.parse(raw):defaultState();}catch(e){return defaultState();}}
-function save(){localStorage.setItem(LS_KEY,JSON.stringify(S));}
-function uid(){return Math.random().toString(36).slice(2,10);}
+/* ---------- SESSION (this browser) + SHARED STATE (cloud) ---------- */
+let SESSION={};try{SESSION=JSON.parse(localStorage.getItem('ptc_session')||'{}');}catch(e){}
+function saveSession(){localStorage.setItem('ptc_session',JSON.stringify(SESSION));}
+let LANG=SESSION.lang||'en';
+let S={users:[],apps:[],matches:[]};
+let deferredInstall=null;
+
+function t(k,vars){let s=(T[LANG][k]!==undefined?T[LANG][k]:T.en[k])||k;if(vars)Object.entries(vars).forEach(([kk,v])=>{s=s.split('{'+kk+'}').join(v);});return s;}
+function setLang(l){LANG=l;SESSION.lang=l;saveSession();document.documentElement.lang=l;render();}
+
+async function api(op,payload={},silent=false){
+  try{
+    const r=await fetch(API_BASE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op,email:SESSION.email||'',...payload})});
+    const d=await r.json();
+    if(d&&d.db)S=d.db;
+    return d||{ok:false,err:'empty'};
+  }catch(e){if(!silent)toast(t('netErr'));return {ok:false,err:'net'};}
+}
+
+const uid=()=>Math.random().toString(36).slice(2,10);
 function todayISO(){return new Date().toISOString().slice(0,10);}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function daysDiff(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
-function me(){return S.users.find(u=>u.id===S.me);}
-function isMaster(){const m=me();return !!m&&m.email===MASTER_ADMIN_EMAIL;}
+function me(){return S.users.find(u=>u.id===SESSION.meId);}
 function userById(id){return S.users.find(u=>u.id===id);}
 function appById(id){return S.apps.find(a=>a.id===id);}
+function isMaster(){return !!me()&&SESSION.email===MASTER_ADMIN_EMAIL;}
 
 /* ---------- 14-DAY CONTINUITY LOGIC (the heart of the app) ---------- */
-/* Returns the current UNBROKEN check-in streak ending today or yesterday.
-   A gap of more than 1 day = streak reset (exactly how Google counts it). */
 function streak(m){
   if(!m.checkins.length) return 0;
   const dates=[...new Set(m.checkins.map(c=>c.date))].sort();
@@ -376,9 +410,7 @@ function streak(m){
   for(let i=dates.length-1;i>0;i--){
     if(daysDiff(dates[i-1],dates[i])===1) run++; else break;
   }
-  const last=dates[dates.length-1];
-  const gap=daysDiff(last,todayISO());
-  if(gap>1) return 0;            // gap — streak reset
+  if(daysDiff(dates[dates.length-1],todayISO())>1) return 0;
   return run;
 }
 function lastCheckin(m){return m.checkins.length?[...m.checkins.map(c=>c.date)].sort().pop():null;}
@@ -392,8 +424,7 @@ function trust(u){
   tt+=asTester.filter(m=>m.status==='done').length*12;
   tt-=asTester.filter(m=>m.status==='abandoned').length*15;
   asTester.filter(m=>m.status==='active').forEach(m=>{tt+=Math.min(streak(m),14);});
-  const withFeedback=asTester.filter(m=>m.surveys&&(m.surveys.d7||m.surveys.d14)).length;
-  tt+=withFeedback*4;
+  tt+=asTester.filter(m=>m.surveys&&(m.surveys.d7||m.surveys.d14)).length*4;
   return Math.max(0,Math.min(100,Math.round(tt)));
 }
 function points(u){
@@ -402,15 +433,30 @@ function points(u){
   return p;
 }
 
+/* ---------- ANDROID VERSION CHECK (requirement: above 11 → 12+) ---------- */
+async function deviceCheck(){
+  const ua=navigator.userAgent;
+  const isAndroid=/Android/i.test(ua);
+  let version=null;
+  if(navigator.userAgentData&&navigator.userAgentData.getHighEntropyValues){
+    try{
+      const h=await navigator.userAgentData.getHighEntropyValues(['platform','platformVersion']);
+      if(h.platform==='Android'&&h.platformVersion)version=parseInt(h.platformVersion);
+    }catch(e){}
+  }
+  if(version===null&&isAndroid){const m2=ua.match(/Android (\d+)/);if(m2)version=parseInt(m2[1]);}
+  return {isAndroid,version,record:{android:isAndroid,version:version}};
+}
+
 /* ---------- TOAST / MODAL ---------- */
 let toastT;
-function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>el.style.display='none',3500);}
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>el.style.display='none',4000);}
 function modal(html){document.getElementById('modalBox').innerHTML=html;document.getElementById('modalWrap').classList.add('open');}
 function closeModal(){document.getElementById('modalWrap').classList.remove('open');}
 document.addEventListener('click',e=>{if(e.target.id==='modalWrap')closeModal();});
 
 /* ---------- GOOGLE SIGN-IN (Google Identity Services) ---------- */
-function googleClientId(){return (S.googleClientId||DEFAULT_GOOGLE_CLIENT_ID||'').trim();}
+function googleClientId(){return (SESSION.googleClientId||DEFAULT_GOOGLE_CLIENT_ID||'').trim();}
 function parseJwt(tok){
   const b=tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
   return JSON.parse(decodeURIComponent(Array.prototype.map.call(atob(b),c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join('')));
@@ -419,23 +465,25 @@ let gisReady=false,gisClientUsed='';
 function maybeInitGoogle(){
   const cid=googleClientId();
   if(!cid||!window.google||!google.accounts) return;
-  if(!gisReady||gisClientUsed!==cid){ // initialize once per Client ID (re-init only when the ID changes)
+  if(!gisReady||gisClientUsed!==cid){
     google.accounts.id.initialize({client_id:cid,callback:onGoogleCredential});
     gisReady=true;gisClientUsed=cid;
   }
   const el=document.getElementById('gBtn');
   if(el){el.innerHTML='';google.accounts.id.renderButton(el,{theme:'filled_black',size:'large',text:'continue_with',locale:LANG==='pl'?'pl':'en',width:300});}
 }
-function onGoogleCredential(resp){
+async function onGoogleCredential(resp){
   let p;
   try{p=parseJwt(resp.credential);}catch(e){toast(t('gReadErr'));return;}
   const email=(p.email||'').toLowerCase();
   if(!email||!p.email_verified){toast(t('gNoMail'));return;}
-  const existing=S.users.find(u=>u.email===email);
-  if(existing){ // returning user — sign in
-    S.me=existing.id;existing.google=true;if(p.picture)existing.picture=p.picture;save();
-    toast(t('welcomeBack',{n:existing.nick}));render();return;
+  const d=await api('register',{email,google:true,picture:p.picture||''});
+  if(d.ok){ // existing account — signed in
+    SESSION.meId=d.meId;SESSION.email=email;saveSession();
+    toast(t('welcomeBack',{n:(me()||{}).nick||''}));
+    await afterLogin();return;
   }
+  if(d.err!=='nick'){toast(t('netErr'));return;}
   // new account — finish sign-up (nickname + declarations)
   const suggested=(p.given_name||p.name||email.split('@')[0]).replace(/\s+/g,'').slice(0,24);
   modal(`<h2 style="margin-top:0">${t('finishTitle')}</h2>
@@ -445,15 +493,15 @@ function onGoogleCredential(resp){
   <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-weight:400;color:var(--text)"><input type="checkbox" id="gTerms" style="width:auto;margin-top:3px"> <span>${t('declTerms')}</span></label>
   <button class="btn" style="width:100%;margin-top:18px" onclick="finishGoogleReg('${esc(email)}','${esc(p.picture||'')}')">${t('createAcc')}</button>`);
 }
-function finishGoogleReg(email,picture){
+async function finishGoogleReg(email,picture){
   const nick=document.getElementById('gNick').value.trim();
   if(nick.length<3){toast(t('vNick'));return;}
   if(!document.getElementById('gDevice').checked||!document.getElementById('gTerms').checked){toast(t('vBoth'));return;}
-  const founder=S.users.length<FREE_LIMIT;
-  const u={id:uid(),nick,email,founder,createdAt:todayISO(),demo:false,google:true,picture:picture||null};
-  S.users.push(u);S.me=u.id;save();closeModal();
-  toast(founder?t('welcomeFounder'):t('created'));
-  render();
+  const d=await api('register',{email,nick,google:true,picture});
+  if(!d.ok){toast(d.err==='nickTaken'?t('nickTaken'):t('netErr'));return;}
+  SESSION.meId=d.meId;SESSION.email=email;saveSession();closeModal();
+  toast((me()||{}).founder?t('welcomeFounder'):t('created'));
+  await afterLogin();
 }
 
 /* ---------- ROUTER ---------- */
@@ -467,15 +515,15 @@ function langSwitcher(){
 
 function render(){
   const root=document.getElementById('root');
-  if(!S.me){root.innerHTML=registerView();maybeInitGoogle();return;}
-  const nick=me()?me().nick:'';
+  if(!SESSION.meId||!me()){root.innerHTML=registerView();maybeInitGoogle();return;}
+  const nick=me().nick;
   root.innerHTML=`
   <div id="layout">
     <div id="sidebar">
       <div class="logo">▶ Play <span>Test</span></div>
       ${VIEW_KEYS.filter(k=>k!=='admin'||isMaster()).map(k=>{const lbl=t('nav_'+k);return `<button class="navbtn ${view===k?'active':''}" onclick="nav('${k}')"><span>${lbl.split(' ')[0]}</span><span class="lbl">${lbl.split(' ').slice(1).join(' ')}</span></button>`;}).join('')}
       ${langSwitcher()}
-      <div class="bottom">${t('signedAs')}: <b>${esc(nick)}</b><br>${t('localMode')}</div>
+      <div class="bottom">${t('signedAs')}: <b>${esc(nick)}</b><br>${t('cloudMode')}</div>
     </div>
     <div id="main">${({dashboard:dashboardView,myapps:myAppsView,exchange:exchangeView,mytests:myTestsView,reputation:reputationView,admin:adminView,settings:settingsView})[view]()}</div>
   </div>`;
@@ -484,12 +532,14 @@ function render(){
 /* ============ REGISTRATION ============ */
 function registerView(){
   const count=S.users.length, left=Math.max(0,FREE_LIMIT-count);
+  const joinApp=SESSION.pendingJoin?appById(SESSION.pendingJoin):null;
   return `<div id="registerView">
     <div style="display:flex;justify-content:flex-end">${langSwitcher()}</div>
     <div style="text-align:center;margin-bottom:26px">
       <div style="font-size:34px;font-weight:800">▶ Play <span style="color:var(--accent)">Test</span></div>
       <div class="muted" style="margin-top:6px">${t('tagline')}</div>
     </div>
+    ${joinApp?`<div class="alert green" style="font-size:15px"><b>${t('inviteTitle')}</b> ${esc(joinApp.title)}<br><span class="muted">${t('inviteJoin')}</span></div>`:''}
     <div class="founderBanner">${t('founderLeft',{n:left,max:FREE_LIMIT})}${left===0?' <span class="badge amber">'+t('founderGone')+'</span>':''}</div>
     <div class="card">
       <h2 style="margin-top:0">${t('signTitle')}</h2>
@@ -504,20 +554,36 @@ function registerView(){
       <button class="btn" style="width:100%;margin-top:20px" onclick="doRegister()">${t('registerBtn')} ${left>0?t('registerFree'):''}</button>
       <div class="muted" style="margin-top:14px;text-align:center">${t('accountNo',{n:count+1,max:FREE_LIMIT})}</div>
     </div>
+    ${deferredInstall?`<div style="text-align:center;margin-top:8px"><button class="btn sec" onclick="doInstall()">${t('installBtn')}</button></div>`:''}
   </div>`;
 }
-function doRegister(){
+async function doRegister(){
   const nick=document.getElementById('regNick').value.trim();
   const email=document.getElementById('regEmail').value.trim().toLowerCase();
-  if(nick.length<3){toast(t('vNick'));return;}
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast(t('vEmail'));return;}
-  const existing=S.users.find(u=>u.email===email);
-  if(existing){S.me=existing.id;save();toast(t('welcomeBack',{n:existing.nick}));render();return;}
+  const existing=await api('register',{email});
+  if(existing.ok){ // known e-mail — sign in
+    SESSION.meId=existing.meId;SESSION.email=email;saveSession();
+    toast(t('welcomeBack',{n:(me()||{}).nick||''}));
+    await afterLogin();return;
+  }
+  if(nick.length<3){toast(t('vNick'));return;}
   if(!document.getElementById('regDevice').checked||!document.getElementById('regTerms').checked){toast(t('vBoth'));return;}
-  const founder=S.users.length<FREE_LIMIT;
-  const u={id:uid(),nick,email,founder,createdAt:todayISO(),demo:false};
-  S.users.push(u);S.me=u.id;save();
-  toast(founder?t('welcomeFounder'):t('created'));
+  const d=await api('register',{email,nick});
+  if(!d.ok){toast(d.err==='nickTaken'?t('nickTaken'):t('netErr'));return;}
+  SESSION.meId=d.meId;SESSION.email=email;saveSession();
+  toast((me()||{}).founder?t('welcomeFounder'):t('created'));
+  await afterLogin();
+}
+async function afterLogin(){
+  if(SESSION.pendingJoin){
+    const appId=SESSION.pendingJoin;
+    delete SESSION.pendingJoin;saveSession();
+    const a=appById(appId);
+    if(a&&a.ownerId!==(me()||{}).id&&!S.matches.some(m=>m.appId===appId&&m.testerId===SESSION.meId)){
+      await acceptChallenge(appId,true);return;
+    }
+  }
   render();
 }
 
@@ -548,12 +614,18 @@ function dashboardView(){
     <div class="card"><div class="muted">${t('statPoints')}</div><div class="stat" style="color:var(--accent)">${points(my)}</div></div>
   </div>
   <h2>${t('todayTitle',{n:todo.length})}</h2>
-  ${todo.length?todo.map(m=>{const a=appById(m.appId);return `
+  ${todo.length?todo.map(m=>{const a=appById(m.appId);if(!a)return '';return `
     <div class="card spread"><div class="row"><div class="appicon">🎮</div><div><b>${esc(a.title)}</b><div class="muted">${t('dayOf',{d:dayNumber(m)+1,max:REQUIRED_DAYS})} · ${t('by')} ${esc(userById(a.ownerId)?.nick||'?')}</div></div></div>
     <button class="btn" onclick="openCheckin('${m.id}')">${t('checkinBtn')}</button></div>`;}).join('')
   :'<div class="card muted">'+t('todayEmpty')+'</div>'}
   <h2>${t('progressTitle')}</h2>
   ${myApps.filter(a=>a.status!=='draft').length?myApps.filter(a=>a.status!=='draft').map(a=>appProgressCard(a)).join(''):'<div class="card muted">'+t('progressEmpty')+'</div>'}`;
+}
+function deviceBadge(m){
+  if(!m.device)return '';
+  if(m.device.android&&m.device.version>=MIN_ANDROID)return ` <span class="badge green">Android ${m.device.version}</span>`;
+  if(m.device.android&&m.device.version)return ` <span class="badge red">Android ${m.device.version}!</span>`;
+  return ` <span class="badge gray">💻</span>`;
 }
 function appProgressCard(a){
   const ms=S.matches.filter(m=>m.appId===a.id&&m.status==='active'&&m.started);
@@ -565,8 +637,9 @@ function appProgressCard(a){
     <div class="progress"><div style="width:${Math.min(100,activeCount/TARGET_TESTERS*100)}%"></div></div>
     <div class="muted">${t('recommend',{n:TARGET_TESTERS,min:GOOGLE_MIN_TESTERS})}<b style="color:var(--accent)">${qualified}</b></div>
     ${ms.map(m=>{const tu=userById(m.testerId);const s=streak(m);const gap=lastCheckin(m)?daysDiff(lastCheckin(m),todayISO()):0;
-      return `<div style="margin-top:10px"><div class="spread"><span>${esc(tu?tu.nick:'?')} <span class="muted">(${t('trust')} ${trust(tu)})</span></span><span class="${s>=REQUIRED_DAYS?'badge green':gap>=2?'badge red':'badge gray'}">${s>=REQUIRED_DAYS?t('full14'):gap>=2?t('streakZero'):t('dayXof',{d:s,max:REQUIRED_DAYS})}</span></div>
-      <div class="progress"><div style="width:${Math.min(100,s/REQUIRED_DAYS*100)}%;${gap>=2?'background:var(--danger)':''}"></div></div></div>`;}).join('')}  </div>`;
+      return `<div style="margin-top:10px"><div class="spread"><span>${esc(tu?tu.nick:'?')} <span class="muted">(${t('trust')} ${trust(tu)})</span>${deviceBadge(m)}</span><span class="${s>=REQUIRED_DAYS?'badge green':gap>=2?'badge red':'badge gray'}">${s>=REQUIRED_DAYS?t('full14'):gap>=2?t('streakZero'):t('dayXof',{d:s,max:REQUIRED_DAYS})}</span></div>
+      <div class="progress"><div style="width:${Math.min(100,s/REQUIRED_DAYS*100)}%;${gap>=2?'background:var(--danger)':''}"></div></div></div>`;}).join('')}
+  </div>`;
 }
 
 /* ============ MY GAMES ============ */
@@ -581,10 +654,14 @@ function myAppsView(){
       <div class="muted">${esc(a.desc||'')}</div>
       <div class="muted" style="word-break:break-all">🔗 ${esc(a.link)}</div></div></div>
       <div class="row">
-        ${a.status==='draft'?`<button class="btn small" onclick="publishApp('${a.id}')">${t('publish')}</button>`:''}
+        ${a.status==='draft'?`<button class="btn small" onclick="publishApp('${a.id}')">${t('publish')}</button>`:`<button class="btn small sec" onclick="copyInvite('${a.id}')">${t('shareBtn')}</button>`}
         <button class="btn small sec" onclick="deleteApp('${a.id}')">${t('del')}</button>
       </div>
     </div>`).join(''):'<div class="card muted">'+t('noGames')+'</div>'}`;
+}
+function copyInvite(appId){
+  const link=SITE+'/#join='+appId;
+  (navigator.clipboard?navigator.clipboard.writeText(link):Promise.reject()).then(()=>toast(t('copied'))).catch(()=>{prompt('Link:',link);});
 }
 function openAddApp(){
   modal(`<h2 style="margin-top:0">${t('addTitle')}</h2>
@@ -594,19 +671,24 @@ function openAddApp(){
   <div class="muted" style="margin-top:8px">${t('optinHint')}</div>
   <div class="row" style="margin-top:20px"><button class="btn" onclick="addApp()">${t('save')}</button><button class="btn sec" onclick="closeModal()">${t('cancel')}</button></div>`);
 }
-function addApp(){
+async function addApp(){
   const title=document.getElementById('apTitle').value.trim();
   const desc=document.getElementById('apDesc').value.trim();
   const link=document.getElementById('apLink').value.trim();
   if(title.length<2){toast(t('vTitle'));return;}
   if(!/^https:\/\/play\.google\.com\/apps\/testing\/[\w.]+/.test(link)){toast(t('vLink'));return;}
-  S.apps.push({id:uid(),ownerId:S.me,title,desc,link,status:'draft',createdAt:todayISO()});
-  save();closeModal();toast(t('savedDraft'));render();
+  const d=await api('addApp',{title,desc,link});
+  if(!d.ok){toast(t('netErr'));return;}
+  closeModal();toast(t('savedDraft'));render();
 }
-function publishApp(id){const a=appById(id);a.status='searching';save();toast(t('published'));render();}
-function deleteApp(id){
-  if(S.matches.some(m=>m.appId===id&&m.status==='active')){toast(t('cantDelete'));return;}
-  S.apps=S.apps.filter(a=>a.id!==id);S.matches=S.matches.filter(m=>m.appId!==id);save();render();
+async function publishApp(id){
+  const d=await api('publishApp',{appId:id});
+  if(d.ok){toast(t('published'));render();}
+}
+async function deleteApp(id){
+  const d=await api('deleteApp',{appId:id});
+  if(!d.ok){toast(d.err==='hasTesters'?t('cantDelete'):t('netErr'));return;}
+  render();
 }
 
 /* ============ TEST EXCHANGE ============ */
@@ -622,23 +704,39 @@ function exchangeView(){
       <button class="btn" onclick="acceptChallenge('${a.id}')">${t('accept')}</button>
     </div>`;}).join(''):'<div class="card muted">'+t('exEmpty')+'</div>'}`;
 }
-function acceptChallenge(appId){
-  const a=appById(appId);
-  S.matches.push({id:uid(),appId,testerId:S.me,accepted:todayISO(),started:null,checkins:[],surveys:{d7:null,d14:null},screenshot:null,status:'active'});
-  if(a.status==='searching')a.status='testing';
-  save();
-  modal(`<h2 style="margin-top:0">${t('acceptedTitle')}</h2>
-  <p style="margin:10px 0">${t('optinFor',{a:esc(a.title)})}</p>
-  <div class="card" style="word-break:break-all;margin:12px 0">${esc(a.link)}</div>
-  <ol style="margin:12px 0 12px 20px;line-height:1.7;font-size:14px">${t('steps')}</ol>
-  <div class="alert amber">${t('warn14')}</div>
-  <button class="btn" onclick="closeModal();nav('mytests')">${t('goMyTests')}</button>`);
-  render();
+async function acceptChallenge(appId,auto){
+  const dev=await deviceCheck();
+  if(dev.isAndroid&&dev.version!==null&&dev.version<MIN_ANDROID){
+    modal(`<h2 style="margin-top:0">${t('androidBlockT')}</h2><p style="margin:12px 0">${t('androidBlock',{min:MIN_ANDROID,v:dev.version})}</p><button class="btn" onclick="closeModal();render();">OK</button>`);
+    return;
+  }
+  const proceed=async()=>{
+    const d=await api('accept',{appId,device:dev.record});
+    if(!d.ok){if(d.err!=='dup')toast(t('netErr'));render();return;}
+    const a=appById(appId);
+    modal(`<h2 style="margin-top:0">${t('acceptedTitle')}</h2>
+    ${auto?`<div class="alert green">${t('autoJoined',{a:esc(a.title)})}</div>`:''}
+    ${dev.isAndroid&&dev.version?`<div class="alert green">${t('androidOk',{v:dev.version})}</div>`:''}
+    <p style="margin:10px 0">${t('optinFor',{a:esc(a.title)})}</p>
+    <a class="btn" style="display:block;text-align:center;text-decoration:none;margin:12px 0" href="${esc(a.link)}" target="_blank" rel="noopener">${t('openPlay')}</a>
+    <div class="card" style="word-break:break-all;margin:12px 0;font-size:13px">${esc(a.link)}</div>
+    <ol style="margin:12px 0 12px 20px;line-height:1.7;font-size:14px">${t('steps')}</ol>
+    <div class="alert amber">${t('warn14')}</div>
+    <button class="btn sec" onclick="closeModal();nav('mytests')">${t('goMyTests')}</button>`);
+    render();
+  };
+  if(!dev.isAndroid&&!auto){
+    modal(`<h2 style="margin-top:0">${t('androidWarnT')}</h2><p style="margin:12px 0">${t('androidWarn',{min:MIN_ANDROID})}</p>
+    <div class="row"><button class="btn" id="contBtn">${t('continueBtn')}</button><button class="btn sec" onclick="closeModal()">${t('cancel')}</button></div>`);
+    document.getElementById('contBtn').onclick=proceed;
+    return;
+  }
+  await proceed();
 }
 
 /* ============ MY TESTS ============ */
 function myTestsView(){
-  const ms=S.matches.filter(m=>m.testerId===S.me);
+  const ms=S.matches.filter(m=>m.testerId===SESSION.meId);
   return `<h1>${t('mtTitle')}</h1><div class="sub">${t('mtSub')}</div>
   ${ms.length?ms.map(m=>{const a=appById(m.appId);if(!a)return '';const s=streak(m);const done=m.status==='done';
     return `<div class="card">
@@ -649,6 +747,7 @@ function myTestsView(){
     ${m.started&&m.status==='active'&&!checkedToday(m)?`<button class="btn" onclick="openCheckin('${m.id}')">${t('checkinBtn')}</button>`:''}
     ${m.started&&m.status==='active'&&checkedToday(m)?`<span class="badge green">${t('doneToday')}</span>`:''}
     </div></div>
+    ${!m.started?`<a class="btn sec" style="display:inline-block;text-decoration:none;margin-top:8px" href="${esc(a.link)}" target="_blank" rel="noopener">${t('openPlay')}</a>`:''}
     ${m.started?`<div class="progress"><div style="width:${Math.min(100,s/REQUIRED_DAYS*100)}%"></div></div>
     <div class="muted">${t('optinLinkLbl')}: <span style="word-break:break-all">${esc(a.link)}</span></div>
     ${s>=7&&!m.surveys.d7&&m.status==='active'?`<div class="alert amber" style="margin-top:10px">${t('d7due',{id:m.id})}</div>`:''}
@@ -663,20 +762,31 @@ function startTest(id){
   <label>${t('firstNote')}</label><textarea id="note0" rows="2" placeholder="${t('firstNotePh')}"></textarea>
   <div class="row" style="margin-top:18px"><button class="btn" onclick="confirmStart('${id}')">${t('startTimer')}</button><button class="btn sec" onclick="closeModal()">${t('cancel')}</button></div>`);
 }
-function confirmStart(id){
-  const m=S.matches.find(x=>x.id===id);
+function compressImage(file){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const max=900;let w=img.width,h=img.height;
+      if(w>max||h>max){const k=Math.min(max/w,max/h);w=Math.round(w*k);h=Math.round(h*k);}
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      resolve(c.toDataURL('image/jpeg',0.72));
+    };
+    img.onerror=reject;
+    img.src=URL.createObjectURL(file);
+  });
+}
+async function confirmStart(id){
   const f=document.getElementById('shot').files[0];
   const note=document.getElementById('note0').value.trim();
   if(!f){toast(t('vShot'));return;}
   if(note.length<10){toast(t('vNote'));return;}
-  const r=new FileReader();
-  r.onload=()=>{
-    m.screenshot={name:f.name,taken:todayISO(),data:String(r.result).slice(0,200000)};
-    m.started=todayISO();
-    m.checkins.push({date:todayISO(),note});
-    save();closeModal();toast(t('started'));render();
-  };
-  r.readAsDataURL(f);
+  let shot;
+  try{shot=await compressImage(f);}catch(e){toast(t('vShot'));return;}
+  const dev=await deviceCheck();
+  const d=await api('start',{matchId:id,note,screenshot:shot,device:dev.record});
+  if(!d.ok){toast(t('netErr'));return;}
+  closeModal();toast(t('started'));render();
 }
 function openCheckin(id){
   const m=S.matches.find(x=>x.id===id);const a=appById(m.appId);
@@ -685,13 +795,14 @@ function openCheckin(id){
   <textarea id="ciNote" rows="3" placeholder="${t('ciPh')}"></textarea>
   <div class="row" style="margin-top:18px"><button class="btn" onclick="doCheckin('${id}')">${t('ciBtn')}</button><button class="btn sec" onclick="closeModal()">${t('cancel')}</button></div>`);
 }
-function doCheckin(id){
-  const m=S.matches.find(x=>x.id===id);
-  if(checkedToday(m)){toast(t('ciDup'));closeModal();return;}
+async function doCheckin(id){
   const note=document.getElementById('ciNote').value.trim();
   if(note.length<10){toast(t('ciShort'));return;}
-  m.checkins.push({date:todayISO(),note});save();closeModal();
-  const s=streak(m);
+  const d=await api('checkin',{matchId:id,note});
+  if(!d.ok){toast(d.err==='dup'?t('ciDup'):t('netErr'));closeModal();render();return;}
+  closeModal();
+  const m=S.matches.find(x=>x.id===id);
+  const s=m?streak(m):0;
   toast(s>=REQUIRED_DAYS?t('ci14'):t('ciOk',{d:s,max:REQUIRED_DAYS}));
   render();
 }
@@ -704,14 +815,14 @@ function openSurvey(id,which){
   <label>${t('q3')}</label><textarea id="q3" rows="2"></textarea>
   <div class="row" style="margin-top:18px"><button class="btn" onclick="submitSurvey('${id}','${which}')">${t('svSend')}</button><button class="btn sec" onclick="closeModal()">${t('svLater')}</button></div>`);
 }
-function submitSurvey(id,which){
-  const m=S.matches.find(x=>x.id===id);
+async function submitSurvey(id,which){
   const q1=document.getElementById('q1').value.trim(),q2=document.getElementById('q2').value.trim(),q3=document.getElementById('q3').value.trim();
   if((q1+q2+q3).length<30){toast(t('svShort'));return;}
-  m.surveys[which]={q1,q2,q3,date:todayISO()};
-  if(which==='d14'&&streak(m)>=REQUIRED_DAYS){m.status='done';toast(t('svDone'));}
-  else toast(t('svSaved'));
-  save();closeModal();render();
+  const d=await api('survey',{matchId:id,which,q1,q2,q3});
+  if(!d.ok){toast(d.err==='short'?t('svShort'):t('netErr'));return;}
+  const m=S.matches.find(x=>x.id===id);
+  toast(which==='d14'&&m&&m.status==='done'?t('svDone'):t('svSaved'));
+  closeModal();render();
 }
 
 /* ============ REPUTATION ============ */
@@ -736,21 +847,9 @@ function reputationView(){
   <div class="card"><b>${t('howTrust')}</b><ul style="margin:10px 0 0 20px;line-height:1.9;font-size:14px;color:var(--muted)">${t('howTrustList')}</ul></div>`;
 }
 
-/* ============ ADMIN ============ */
-let adminUnlocked=false;
+/* ============ ADMIN (master account only — no PIN needed) ============ */
 function adminView(){
-  if(!isMaster()&&view==='admin'){view='dashboard';return dashboardView();} // admin is master-only
-  if(isMaster())adminUnlocked=true; // the owner's account needs no PIN
-  if(!S.adminPin&&!isMaster()){
-    return `<h1>${t('admTitle')}</h1><div class="sub">${t('admFirst')}</div>
-    <div class="card" style="max-width:420px"><label>${t('newPin')}</label><input id="pinNew" type="password" maxlength="8" inputmode="numeric">
-    <button class="btn" style="margin-top:16px" onclick="setPin()">${t('setPin')}</button></div>`;
-  }
-  if(!adminUnlocked){
-    return `<h1>${t('admTitle')}</h1><div class="sub">${t('admOnly')}</div>
-    <div class="card" style="max-width:420px"><label>${t('pin')}</label><input id="pinIn" type="password" maxlength="8" inputmode="numeric" onkeydown="if(event.key==='Enter')unlockAdmin()">
-    <button class="btn" style="margin-top:16px" onclick="unlockAdmin()">${t('unlock')}</button></div>`;
-  }
+  if(!isMaster()){view='dashboard';return dashboardView();}
   const count=S.users.length,left=Math.max(0,FREE_LIMIT-count);
   const byDay={};S.users.forEach(u=>{byDay[u.createdAt]=(byDay[u.createdAt]||0)+1;});
   const days=Object.keys(byDay).sort().slice(-14);
@@ -766,86 +865,72 @@ function adminView(){
     <div style="height:20px"></div></div>
   <div class="card"><b>${t('admList',{n:count})}</b>
     <table style="margin-top:10px"><tr><th>${t('colNo')}</th><th>${t('colNick')}</th><th>${t('colEmail')}</th><th>${t('colDate')}</th><th>${t('colStatus')}</th><th>${t('colTrust')}</th></tr>
-    ${S.users.map((u,i)=>`<tr><td>${i+1}</td><td>${esc(u.nick)}${u.demo?' <span class="badge gray">demo</span>':''}</td><td>${esc(u.email)}</td><td>${u.createdAt}</td><td>${u.founder?'<span class="badge green">'+t('stFounder')+'</span>':'<span class="badge amber">'+t('stPaid')+'</span>'}</td><td>${trust(u)}</td></tr>`).join('')}
+    ${S.users.map((u,i)=>`<tr><td>${i+1}</td><td>${esc(u.nick)}</td><td>${esc(u.email||'•••')}</td><td>${u.createdAt}</td><td>${u.founder?'<span class="badge green">'+t('stFounder')+'</span>':'<span class="badge amber">'+t('stPaid')+'</span>'}</td><td>${trust(u)}</td></tr>`).join('')}
     </table></div>
   <div class="alert amber">${t('admPay')}</div>`;
 }
-function setPin(){const p=document.getElementById('pinNew').value.trim();if(!/^\d{4,8}$/.test(p)){toast(t('vPin'));return;}S.adminPin=p;save();adminUnlocked=true;toast(t('pinSet'));render();}
-function unlockAdmin(){if(document.getElementById('pinIn').value===S.adminPin){adminUnlocked=true;render();}else toast(t('pinBad'));}
 
 /* ============ SETTINGS ============ */
 function settingsView(){
   return `<h1>${t('setTitle')}</h1><div class="sub">${t('setSub')}</div>
   <div class="card"><b>${t('langTitle')}</b><div style="height:8px"></div>${langSwitcher()}</div>
+  <div class="card"><b>${t('installTitle')}</b>
+  <p class="muted" style="margin:8px 0 14px">${t('installInfo')}</p>
+  ${deferredInstall?`<button class="btn" onclick="doInstall()">${t('installBtn')}</button>`:`<div class="muted">${t('installHint')}</div>`}</div>
   <div class="card"><b>${t('dbTitle')}</b>
   <p class="muted" style="margin:8px 0 14px">${t('dbInfo')}</p>
-  <div class="row"><button class="btn" onclick="exportJSON()">${t('exportBtn')}</button>
-  <label class="btn sec" style="width:auto;margin:0;cursor:pointer">${t('importBtn')}<input type="file" accept=".json" style="display:none" onchange="importJSON(event)"></label></div></div>
+  <button class="btn" onclick="exportJSON()">${t('exportBtn')}</button></div>
   <div class="card"><b>${t('gTitle')}</b>
   <p class="muted" style="margin:8px 0 14px">${t('gInfo')}</p>
-  <label>OAuth Client ID</label><input id="gcid" placeholder="e.g. 1234567890-abc123.apps.googleusercontent.com" value="${esc(S.googleClientId||'')}">
-  <button class="btn" style="margin-top:14px" onclick="saveClientId()">${t('gSaveBtn')}</button></div>
-  <div class="card"><b>${t('demoTitle')}</b>
-  <p class="muted" style="margin:8px 0 14px">${t('demoInfo')}</p>
-  <button class="btn sec" onclick="seedDemo()">${t('demoBtn')}</button></div>
+  <label>OAuth Client ID</label><input id="gcid" placeholder="....apps.googleusercontent.com" value="${esc(SESSION.googleClientId||'')}">
+  <button class="btn sec" style="margin-top:14px" onclick="saveClientId()">${t('gSaveBtn')}</button></div>
   <div class="card"><b>${t('dangerTitle')}</b><div style="height:10px"></div>
-  <div class="row"><button class="btn danger" onclick="if(confirm(t('resetConfirm'))){localStorage.removeItem(LS_KEY);location.reload();}">${t('resetBtn')}</button>
-  <button class="btn sec" onclick="S.me=null;save();render();">${t('logout')}</button></div></div>
+  <button class="btn sec" onclick="delete SESSION.meId;delete SESSION.email;saveSession();render();">${t('logout')}</button></div>
   <div class="card muted" style="font-size:13px">${t('footer')}</div>`;
 }
 function saveClientId(){
   const v=document.getElementById('gcid').value.trim();
   if(v&&!/\.apps\.googleusercontent\.com$/.test(v)){toast(t('gBad'));return;}
-  S.googleClientId=v;save();
+  if(v)SESSION.googleClientId=v;else delete SESSION.googleClientId;
+  saveSession();
   toast(v?t('gSaved'):t('gRemoved'));
 }
 function exportJSON(){
   const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='playtest-connect-db-'+todayISO()+'.json';a.click();
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='play-test-backup-'+todayISO()+'.json';a.click();
   toast(t('exported'));
 }
-function importJSON(ev){
-  const f=ev.target.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.users||!d.apps)throw 0;S=d;LANG=S.lang||'en';save();toast(t('imported'));render();}catch(e){toast(t('importBad'));}};
-  r.readAsText(f);
-}
-function iso(offsetDays){const d=new Date();d.setDate(d.getDate()+offsetDays);return d.toISOString().slice(0,10);}
-function seedDemo(){
-  const names=[['PixelPaul','paul@demo.dev'],['GameDevGrace','grace@demo.dev'],['IndieIgor','igor@demo.dev'],['RetroRita','rita@demo.dev'],['MobileMark','mark@demo.dev'],['StudioSam','sam@demo.dev'],['CasualKate','kate@demo.dev']];
-  const games=[['Neon Runner','Fast 2D platformer — test levels 1–5 and the shop','com.demo.neonrunner'],['Ball Master','Match-3 puzzle — check the tournament mode','com.demo.balls'],['Speedy Courier','Delivery sim — test the city map and missions','com.demo.courier'],['Mage Tower','Fantasy tower defense — balance of waves 10+','com.demo.tower']];
-  const newUsers=[];
-  names.forEach(([nick,email],i)=>{
-    if(S.users.some(u=>u.email===email))return;
-    const u={id:uid(),nick,email,founder:S.users.length<FREE_LIMIT,createdAt:iso(-13+i*2),demo:true};
-    S.users.push(u);newUsers.push(u);
-  });
-  games.forEach(([title,desc,pkg],i)=>{
-    const owner=newUsers[i%Math.max(1,newUsers.length)];
-    if(!owner||S.apps.some(a=>a.link.endsWith(pkg)))return;
-    S.apps.push({id:uid(),ownerId:owner.id,title,desc,link:'https://play.google.com/apps/testing/'+pkg,status:'searching',createdAt:iso(-6)});
-  });
-  // one live demo test between demo accounts so the dashboard has life
-  if(newUsers.length>=2&&S.apps.length){
-    const app=S.apps.find(a=>a.ownerId===newUsers[0].id);
-    if(app&&!S.matches.some(m=>m.appId===app.id)){
-      const m={id:uid(),appId:app.id,testerId:newUsers[1].id,accepted:iso(-5),started:iso(-5),checkins:[],surveys:{d7:null,d14:null},screenshot:null,status:'active'};
-      for(let d=-5;d<=0;d++)m.checkins.push({date:iso(d),note:'Tested level '+(6+d)+', works fine.'});
-      S.matches.push(m);app.status='testing';
-    }
-  }
-  save();toast(t('demoLoaded',{n:newUsers.length}));render();
+
+/* ---------- PWA INSTALL ---------- */
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;});
+async function doInstall(){
+  if(!deferredInstall)return;
+  deferredInstall.prompt();
+  const r=await deferredInstall.userChoice;
+  if(r.outcome==='accepted'){toast(t('installed'));deferredInstall=null;render();}
 }
 
-/* founder #1 — the platform owner is always the first registered account */
-if(!S.users.some(u=>u.email===MASTER_ADMIN_EMAIL)){
-  S.users.unshift({id:'founder-001',nick:'Kawalko34',email:MASTER_ADMIN_EMAIL,founder:true,createdAt:'2026-07-06',demo:false,google:true});
-  save();
+/* ---------- LIVE REFRESH (owner + admin see changes automatically) ---------- */
+async function pollState(){
+  if(document.getElementById('modalWrap').classList.contains('open'))return;
+  const before=JSON.stringify(S);
+  const d=await api('state',{},true);
+  if(d.ok&&JSON.stringify(S)!==before)render();
 }
 
-/* start */
-document.documentElement.lang=LANG;
-render();
+/* ---------- START ---------- */
+(async()=>{
+  document.documentElement.lang=LANG;
+  const jm=location.hash.match(/join=(\w+)/);
+  if(jm){SESSION.pendingJoin=jm[1];saveSession();history.replaceState(null,'',location.pathname);}
+  const el=document.getElementById('loadTxt');if(el)el.textContent=t('loading');
+  const d=await api('state');
+  if(d.ok&&d.meId&&SESSION.email&&!SESSION.meId){SESSION.meId=d.meId;saveSession();}
+  if(SESSION.meId&&me()&&SESSION.pendingJoin){await afterLogin();}
+  else render();
+  setInterval(pollState,25000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollState();});
+})();
 </script>
 </body>
 </html>

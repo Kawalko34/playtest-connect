@@ -1,0 +1,9 @@
+{
+  "name": "play-test",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Play Test - Google Play closed testing exchange",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}
