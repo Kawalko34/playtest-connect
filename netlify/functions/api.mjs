@@ -88,14 +88,18 @@ function issueToken(u) {
   return tk;
 }
 
-/* e-mails are visible only to their (authenticated) owner and to the master admin */
+/* e-mails: visible to their owner, to the master admin, and to developers whose app
+   the user tests (Google Play closed testing requires adding the tester's e-mail to the list) */
 function publicView(db, email, authed) {
   const master = authed && email === MASTER;
+  const viewer = authed ? db.users.find(u => u.email === email) : null;
+  const myAppIds = viewer ? db.apps.filter(a => a.ownerId === viewer.id).map(a => a.id) : [];
+  const myTesterIds = new Set(db.matches.filter(m => myAppIds.includes(m.appId)).map(m => m.testerId));
   return {
     users: db.users.map(u => ({
       id: u.id, nick: u.nick, founder: u.founder, createdAt: u.createdAt,
-      google: !!u.google, demo: !!u.demo,
-      email: (master || (authed && u.email === email)) ? u.email : undefined
+      google: !!u.google, demo: !!u.demo, phone: u.phone || '',
+      email: (master || (authed && u.email === email) || myTesterIds.has(u.id)) ? u.email : undefined
     })),
     apps: db.apps,
     matches: db.matches.map(m => ({ ...m })) // tokens never live on matches; users mapped above
@@ -138,8 +142,10 @@ export default async (req) => {
       const nick = String(body.nick || '').trim().slice(0, 24);
       if (nick.length < 3) return json({ ok: false, err: 'nick' });
       if (db.users.some(x => x.nick.toLowerCase() === nick.toLowerCase())) return json({ ok: false, err: 'nickTaken' });
+      const phone = String(body.phone || '').trim().slice(0, 40);
+      if (phone.length < 2) return json({ ok: false, err: 'phone' }); // Android phone model is mandatory
       const isGoogle = !!(body.google && await verifyGoogleToken(body.idToken, email));
-      u = { id: uid(), nick, email, founder: db.users.length < FREE_LIMIT, createdAt: today(), google: isGoogle, picture: body.picture || null, demo: false, tokens: [] };
+      u = { id: uid(), nick, email, phone, founder: db.users.length < FREE_LIMIT, createdAt: today(), google: isGoogle, picture: body.picture || null, demo: false, tokens: [] };
       const tk = issueToken(u);
       db.users.push(u);
       await saveDb(db);
