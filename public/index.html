@@ -119,7 +119,7 @@ td{padding:9px 10px;border-bottom:1px solid var(--border)}
    Backend: Netlify Function (/api) + Netlify Blobs
    Session (who am I) + language live in this browser only.
    ============================================================ */
-const FREE_LIMIT=100, GOOGLE_MIN_TESTERS=12, TARGET_TESTERS=14, REQUIRED_DAYS=14;
+const FREE_LIMIT=50, GOOGLE_MIN_TESTERS=12, TARGET_TESTERS=14, REQUIRED_DAYS=14;
 const MIN_ANDROID=12; /* "Android above 11" = 12+ */
 const MASTER_ADMIN_EMAIL='kawalko334411@gmail.com';
 const DEFAULT_GOOGLE_CLIENT_ID='832482048394-0be28ltmam33msagi9srk0hmrs0juctq.apps.googleusercontent.com';
@@ -177,6 +177,13 @@ en:{
   guideDevSteps:'<li>In <b>Google Play Console</b> open your app → <b>Testing → Closed testing</b> → create a track, upload your <b>.aab</b> file and <b>submit for review</b> (Google usually approves within 1–3 days).</li><li>On the track’s <b>Testers</b> tab create an e-mail list and copy the <b>opt-in link</b> (it looks like <i>play.google.com/apps/testing/your.package</i>).</li><li>In Play Test open <b>🎮 My games → “＋ Add a new game”</b>, paste the opt-in link and press <b>“📢 Find testers”</b>.</li><li>Send people your <b>“🔗 Invite / QR”</b> — whoever opens it joins your test automatically after signing in.</li><li>When a tester joins, their <b>e-mail appears on your Dashboard</b> — add it to your tester list in Play Console, otherwise Google won’t let them download the game.</li><li>Watch progress live. After <b>14 days with 12+ testers</b>, apply for production access in Play Console — use your testers’ surveys to answer Google’s questions.</li>',
   helpNote:'Requirements in short: real Android phone with <b>Android 12+</b> (above 11), honest daily testing, no emulators, and never exchange Play Store reviews — only testing.',
   goExchange:'Open the Test exchange',goAddGame:'＋ Add my game now',
+  oneT:'🔒 One-for-one rule',
+  oneI:'Before you list your own game, start testing at least one game for someone else. Pick one on the exchange, install it and press “Downloaded &amp; launched” — then this section unlocks.',
+  goPick:'🔄 Pick a game to test',
+  mustTestErr:'First start testing someone’s game — one-for-one rule.',
+  pathT:'What would you like to do?',
+  pathTest:'🎮 Test games',pathTestD:'Join someone’s test in 2 minutes — earn points and Trust.',
+  pathList:'🚀 Get testers for my game',pathListD:'Step 1: test one game for someone (one-for-one). Step 2: add your game.',
   addTitle:'Add a game',gameTitle:'Game title',gameTitlePh:'e.g. Neon Runner',
   gameDesc:'Short description (what to test?)',gameDescPh:'e.g. 2D platformer — check levels 1–5, the shop and ads',
   optinLink:'Opt-in link from Google Play Console',
@@ -319,6 +326,13 @@ pl:{
   guideDevSteps:'<li>W <b>Google Play Console</b> otwórz swoją aplikację → <b>Testowanie → Test zamknięty</b> → utwórz ścieżkę, wgraj plik <b>.aab</b> i <b>prześlij do sprawdzenia</b> (Google zatwierdza zwykle w 1–3 dni).</li><li>W zakładce <b>Testerzy</b> tej ścieżki utwórz listę e-mail i skopiuj <b>link opt-in</b> (wygląda jak <i>play.google.com/apps/testing/twoj.pakiet</i>).</li><li>W Play Test wejdź w <b>🎮 Moje gry → „＋ Dodaj nową grę"</b>, wklej link opt-in i kliknij <b>„📢 Szukam testerów"</b>.</li><li>Roześlij <b>„🔗 Zaproś / QR"</b> — kto otworzy, ten po zalogowaniu automatycznie dołącza do Twojego testu.</li><li>Gdy tester dołączy, jego <b>e-mail pojawi się na Twoim Panelu</b> — dopisz go do listy testerów w Play Console, inaczej Google nie pozwoli mu pobrać gry.</li><li>Obserwuj postęp na żywo. Po <b>14 dniach z 12+ testerami</b> złóż w Play Console wniosek o dostęp produkcyjny — w odpowiedziach dla Google użyj ankiet od testerów.</li>',
   helpNote:'Wymogi w skrócie: prawdziwy telefon z <b>Androidem 12+</b> (powyżej 11), uczciwe codzienne testowanie, zero emulatorów i nigdy wymiana recenzji w Sklepie Play — tylko testy.',
   goExchange:'Otwórz Giełdę testów',goAddGame:'＋ Dodaj moją grę teraz',
+  oneT:'🔒 Zasada „jeden za jeden"',
+  oneI:'Zanim wystawisz własną grę, zacznij testować przynajmniej jedną grę dla kogoś innego. Wybierz grę na giełdzie, zainstaluj i kliknij „Pobrałem i uruchomiłem" — wtedy ta sekcja się odblokuje.',
+  goPick:'🔄 Wybierz grę do testowania',
+  mustTestErr:'Najpierw zacznij testować czyjąś grę — zasada „jeden za jeden".',
+  pathT:'Co chcesz zrobić?',
+  pathTest:'🎮 Testuję gry',pathTestD:'Dołącz do czyjegoś testu w 2 minuty — zbieraj punkty i Trust.',
+  pathList:'🚀 Szukam testerów do mojej gry',pathListD:'Krok 1: przetestuj jedną grę dla kogoś (jeden za jeden). Krok 2: dodaj swoją grę.',
   addTitle:'Dodaj grę',gameTitle:'Tytuł gry',gameTitlePh:'np. Neon Runner',
   gameDesc:'Krótki opis (co testować?)',gameDescPh:'np. platformówka 2D — sprawdź poziomy 1–5, sklep i reklamy',
   optinLink:'Link opt-in z Google Play Console',
@@ -674,8 +688,13 @@ function dashboardView(){
     });
   });
 
+  const isNew=myApps.length===0&&S.matches.filter(m=>m.testerId===my.id).length===0;
   return `<h1>${t('dashTitle')}</h1><div class="sub">${t('hello',{n:esc(my.nick)})} ${isMaster()?'<span class="badge blue">👑 Master Admin</span> ':''}${my.founder?'<span class="badge green">'+t('founderBadge')+'</span>':''}</div>
   <div class="founderBanner">${t('registered',{n:count,left:left,max:FREE_LIMIT})}</div>
+  ${isNew?`<h2>${t('pathT')}</h2><div class="grid c2">
+    <div class="card" style="cursor:pointer" onclick="nav('exchange')"><div style="font-size:26px">🎮</div><b>${t('pathTest')}</b><p class="muted" style="margin-top:6px">${t('pathTestD')}</p><button class="btn" style="margin-top:10px">${t('goExchange')}</button></div>
+    <div class="card" style="cursor:pointer" onclick="openGuide('dev')"><div style="font-size:26px">🚀</div><b>${t('pathList')}</b><p class="muted" style="margin-top:6px">${t('pathListD')}</p><button class="btn sec" style="margin-top:10px">${t('guideDevT').split(' — ')[0]}</button></div>
+  </div>`:''}
   ${alerts}
   <div class="grid c3">
     <div class="card"><div class="muted">${t('statMyApps')}</div><div class="stat">${myApps.filter(a=>a.status!=='draft').length}</div></div>
@@ -713,10 +732,14 @@ function appProgressCard(a){
 }
 
 /* ============ MY GAMES ============ */
+/* one-for-one: you can list a game only after you started testing one for someone else */
+function canAddApp(){return isMaster()||S.matches.some(m=>m.testerId===SESSION.meId&&m.started);}
 function myAppsView(){
   const my=me();const myApps=S.apps.filter(a=>a.ownerId===my.id);
   return `<h1>${t('myappsTitle')}</h1><div class="sub">${t('myappsSub')}</div>
-  <button class="btn" onclick="openAddApp()">${t('addGame')}</button>
+  ${canAddApp()
+    ?`<button class="btn" onclick="openAddApp()">${t('addGame')}</button>`
+    :`<div class="card"><b>${t('oneT')}</b><p class="muted" style="margin:8px 0 14px">${t('oneI')}</p><button class="btn" onclick="nav('exchange')">${t('goPick')}</button></div>`}
   <div style="height:18px"></div>
   ${myApps.length?myApps.map(a=>`
     <div class="card spread">
@@ -765,6 +788,11 @@ function showQr(title,link,caption){
   <button class="btn sec" onclick="closeModal()">OK</button>`);
 }
 function openAddApp(){
+  if(!canAddApp()){
+    modal(`<h2 style="margin-top:0">${t('oneT')}</h2><p style="margin:12px 0">${t('oneI')}</p>
+    <button class="btn" style="width:100%" onclick="closeModal();nav('exchange')">${t('goPick')}</button>`);
+    return;
+  }
   modal(`<h2 style="margin-top:0">${t('addTitle')}</h2>
   <label>${t('gameTitle')}</label><input id="apTitle" maxlength="60" placeholder="${t('gameTitlePh')}">
   <label>${t('gameDesc')}</label><textarea id="apDesc" rows="3" maxlength="300" placeholder="${t('gameDescPh')}"></textarea>
@@ -779,7 +807,7 @@ async function addApp(){
   if(title.length<2){toast(t('vTitle'));return;}
   if(!/^https:\/\/play\.google\.com\/apps\/testing\/[\w.]+/.test(link)){toast(t('vLink'));return;}
   const d=await api('addApp',{title,desc,link});
-  if(!d.ok){toast(t('netErr'));return;}
+  if(!d.ok){toast(d.err==='mustTest'?t('mustTestErr'):t('netErr'));return;}
   closeModal();toast(t('savedDraft'));render();
 }
 async function publishApp(id){
@@ -1060,7 +1088,7 @@ if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceW
   if(d.ok&&d.meId&&SESSION.email&&!SESSION.meId){SESSION.meId=d.meId;saveSession();}
   if(SESSION.meId&&me()&&SESSION.pendingJoin){await afterLogin();}
   else render();
-  setInterval(pollState,25000);
+  setInterval(pollState,60000); // 60 s — gentle on hosting quota; visibilitychange refreshes instantly on return
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollState();});
 })();
 </script>

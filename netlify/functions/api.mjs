@@ -5,7 +5,7 @@ import { getStore } from '@netlify/blobs';
 
 const MASTER = 'kawalko334411@gmail.com';
 const GOOGLE_CLIENT_ID = '832482048394-0be28ltmam33msagi9srk0hmrs0juctq.apps.googleusercontent.com';
-const FREE_LIMIT = 100;
+const FREE_LIMIT = 50;
 const REQUIRED_DAYS = 14;
 const ABANDON_AFTER_DAYS = 5;   // started test with no check-in for this long => abandoned
 const STALE_ACCEPT_DAYS = 7;    // accepted but never started for this long => abandoned
@@ -162,6 +162,8 @@ export default async (req) => {
     if (!authed) return json({ ok: false, err: 'auth' }, 401);
 
     if (op === 'addApp') {
+      // one-for-one rule: you must actively test someone's game before listing your own (owner exempt)
+      if (me.email !== MASTER && !db.matches.some(m => m.testerId === me.id && m.started)) return json({ ok: false, err: 'mustTest' });
       const title = String(body.title || '').trim();
       const link = String(body.link || '').trim();
       if (title.length < 2) return json({ ok: false, err: 'title' });
