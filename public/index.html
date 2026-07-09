@@ -127,8 +127,8 @@ const SITE='https://playtest-connect.netlify.app';
 const API_BASE=(location.hostname.endsWith('netlify.app')||location.port==='8888')?'/api':SITE+'/api';
 /* SUPABASE backend (database of the Lovable project play-test-booster).
    Fill both constants to switch the app off the Netlify function entirely. */
-const SUPA_URL='';  // e.g. https://xxxx.supabase.co
-const SUPA_KEY='';  // anon / publishable key
+const SUPA_URL='https://lhvmewgiuaghixwemcie.supabase.co';
+const SUPA_KEY='sb_publishable_Va3HyNBeF8uUz1P8fRcTqg_G8Lf4imI';
 const RPC_MAP={state:'pt_state',register:'pt_register',addApp:'pt_add_app',publishApp:'pt_publish_app',deleteApp:'pt_delete_app',accept:'pt_accept',start:'pt_start',checkin:'pt_checkin',survey:'pt_survey',screenshot:'pt_shot_get'};
 const ARG_MAP={nick:'p_nick',phone:'p_phone',google:'p_google',picture:'p_picture',title:'p_title',desc:'p_desc',link:'p_link',appId:'p_app_id',matchId:'p_match_id',note:'p_note',screenshot:'p_shot',device:'p_device',localDate:'p_local',which:'p_which',q1:'p_q1',q2:'p_q2',q3:'p_q3'};
 
@@ -447,7 +447,7 @@ async function api(op,payload={},silent=false){
   try{
     let r;
     if(SUPA_URL&&SUPA_KEY&&RPC_MAP[op]){ // Supabase RPC backend
-      const args={p_email:SESSION.email||''};
+      const args={p_email:payload.email!==undefined?payload.email:(SESSION.email||'')};
       if(op!=='register')args.p_token=SESSION.token||'';
       for(const k in payload){if(ARG_MAP[k]&&payload[k]!==undefined)args[ARG_MAP[k]]=payload[k];}
       r=await fetch(SUPA_URL+'/rest/v1/rpc/'+RPC_MAP[op],{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY},body:JSON.stringify(args)});
