@@ -189,7 +189,7 @@ en:{
   mustTestErr:'First start testing someone’s game — one-for-one rule.',
   pathT:'What would you like to do?',
   pathTest:'🎮 Test games',pathTestD:'Join someone’s test in 2 minutes — earn points and Trust.',
-  pathList:'🚀 Get testers for my game',pathListD:'Step 1: test one game for someone (one-for-one). Step 2: add your game.',
+  pathList:'🚀 Get testers for my game',pathListD:'Add your game, share the invite link — and you can self-test it once yourself too.',
   copyEmails:'📋 Copy tester e-mails',emailsCopied:'Tester e-mails copied — paste them into your tester list in Play Console.',noEmails:'No testers yet.',
   addConsoleHint:'👉 Copy these e-mails and add them to your closed-test tester list in Google Play Console — otherwise testers cannot download your game.',
   genGoogle:'📝 Answer for Google',
@@ -351,7 +351,7 @@ pl:{
   mustTestErr:'Najpierw zacznij testować czyjąś grę — zasada „jeden za jeden".',
   pathT:'Co chcesz zrobić?',
   pathTest:'🎮 Testuję gry',pathTestD:'Dołącz do czyjegoś testu w 2 minuty — zbieraj punkty i Trust.',
-  pathList:'🚀 Szukam testerów do mojej gry',pathListD:'Krok 1: przetestuj jedną grę dla kogoś (jeden za jeden). Krok 2: dodaj swoją grę.',
+  pathList:'🚀 Szukam testerów do mojej gry',pathListD:'Dodaj swoją grę, roześlij link zaproszenia — możesz też raz przetestować ją sam.',
   copyEmails:'📋 Kopiuj e-maile testerów',emailsCopied:'E-maile skopiowane — wklej je do listy testerów w Play Console.',noEmails:'Brak testerów.',
   addConsoleHint:'👉 Skopiuj te e-maile i dodaj je do listy testerów testu zamkniętego w Google Play Console — inaczej testerzy nie pobiorą Twojej gry.',
   genGoogle:'📝 Odpowiedź dla Google',
@@ -788,8 +788,8 @@ function appProgressCard(a){
 }
 
 /* ============ MY GAMES ============ */
-/* one-for-one: you can list a game only after you started testing SOMEONE ELSE'S game (self-tests don't count) */
-function canAddApp(){return isMaster()||S.matches.some(m=>{const a=appById(m.appId);return m.testerId===SESSION.meId&&m.started&&a&&a.ownerId!==SESSION.meId;});}
+/* anyone can add their game right away (one-for-one gate removed — self-test is limited to once anyway) */
+function canAddApp(){return true;}
 function selfTestingApp(appId){return S.matches.some(m=>m.appId===appId&&m.testerId===SESSION.meId);}
 function myAppsView(){
   const my=me();const myApps=S.apps.filter(a=>a.ownerId===my.id);
