@@ -201,6 +201,8 @@ en:{
   genFeedback:'Feedback received & changes made:',genNoFeedback:'(No survey feedback yet — testers fill surveys on day 7 and 14.)',
   chatBtn:'💬 Chat',chatWith:'Chat with',chatTitle:'💬 Chat — {a}',chatPh:'Write a message…',chatSend:'Send',chatEmpty:'No messages yet. Say hi 👋',chatYou:'You',
   waitingAdd:'⏳ waiting to be added in Play Console',
+  selfTestBtn:'🧪 Test it myself (once)',selfTesting:'🧪 you are self-testing this',youLabel:'(you)',
+  selfTestInfo:'Your own account counts as one tester (Google allows this). You can self-test each of your games once — it does NOT count toward the one-for-one rule.',
   addTitle:'Add a game',gameTitle:'Game title',gameTitlePh:'e.g. Neon Runner',
   gameDesc:'Short description (what to test?)',gameDescPh:'e.g. 2D platformer — check levels 1–5, the shop and ads',
   optinLink:'Opt-in link from Google Play Console',
@@ -361,6 +363,8 @@ pl:{
   genFeedback:'Otrzymany feedback i wprowadzone zmiany:',genNoFeedback:'(Brak feedbacku z ankiet — testerzy wypełniają ankiety w dniu 7 i 14.)',
   chatBtn:'💬 Czat',chatWith:'Czat z',chatTitle:'💬 Czat — {a}',chatPh:'Napisz wiadomość…',chatSend:'Wyślij',chatEmpty:'Brak wiadomości. Przywitaj się 👋',chatYou:'Ty',
   waitingAdd:'⏳ czeka na dodanie w Play Console',
+  selfTestBtn:'🧪 Testuj sam (raz)',selfTesting:'🧪 sam testujesz tę grę',youLabel:'(Ty)',
+  selfTestInfo:'Twoje własne konto liczy się jako jeden tester (Google na to pozwala). Każdą swoją grę możesz przetestować sam raz — to NIE liczy się do zasady „jeden za jeden".',
   addTitle:'Dodaj grę',gameTitle:'Tytuł gry',gameTitlePh:'np. Neon Runner',
   gameDesc:'Krótki opis (co testować?)',gameDescPh:'np. platformówka 2D — sprawdź poziomy 1–5, sklep i reklamy',
   optinLink:'Link opt-in z Google Play Console',
@@ -776,15 +780,17 @@ function appProgressCard(a){
     <div class="row" style="margin:8px 0"><button class="btn small" onclick="copyEmails('${a.id}')">${t('copyEmails')}</button><button class="btn small sec" onclick="openGoogleAnswer('${a.id}')">${t('genGoogle')}</button></div>`:''}
     ${all.map(m=>{const tu=userById(m.testerId);const s=streak(m);const gap=lastCheckin(m)?daysDiff(lastCheckin(m),todayISO()):0;const unread=msgsFor(m.id).length;
       const badge=!m.started?'<span class="badge amber">'+t('waitingAdd')+'</span>':s>=REQUIRED_DAYS?'<span class="badge green">'+t('full14')+'</span>':gap>=2?'<span class="badge red">'+t('streakZero')+'</span>':'<span class="badge gray">'+t('dayXof',{d:s,max:REQUIRED_DAYS})+'</span>';
-      return `<div style="margin-top:10px"><div class="spread"><span>${esc(tu?tu.nick:'?')} <span class="muted">(${t('trust')} ${trust(tu)})</span>${deviceBadge(m)}</span><span class="row" style="gap:6px"><button class="btn small sec" onclick="openChat('${m.id}')">${t('chatBtn')}${unread?' ('+unread+')':''}</button>${badge}</span></div>
+      const isSelf=m.testerId===a.ownerId;
+      return `<div style="margin-top:10px"><div class="spread"><span>${esc(tu?tu.nick:'?')}${isSelf?' <span class="badge blue">'+t('youLabel')+'</span>':''} <span class="muted">(${t('trust')} ${trust(tu)})</span>${deviceBadge(m)}</span><span class="row" style="gap:6px">${isSelf?'':`<button class="btn small sec" onclick="openChat('${m.id}')">${t('chatBtn')}${unread?' ('+unread+')':''}</button>`}${badge}</span></div>
       ${tu&&(tu.email||tu.phone)?`<div class="muted" style="font-size:12px">${tu.email?'✉ '+esc(tu.email):''}${tu.email&&tu.phone?' · ':''}${tu.phone?'📱 '+esc(tu.phone):''}</div>`:''}
       <div class="progress"><div style="width:${Math.min(100,s/REQUIRED_DAYS*100)}%;${gap>=2?'background:var(--danger)':''}"></div></div></div>`;}).join('')}
   </div>`;
 }
 
 /* ============ MY GAMES ============ */
-/* one-for-one: you can list a game only after you started testing one for someone else */
-function canAddApp(){return isMaster()||S.matches.some(m=>m.testerId===SESSION.meId&&m.started);}
+/* one-for-one: you can list a game only after you started testing SOMEONE ELSE'S game (self-tests don't count) */
+function canAddApp(){return isMaster()||S.matches.some(m=>{const a=appById(m.appId);return m.testerId===SESSION.meId&&m.started&&a&&a.ownerId!==SESSION.meId;});}
+function selfTestingApp(appId){return S.matches.some(m=>m.appId===appId&&m.testerId===SESSION.meId);}
 function myAppsView(){
   const my=me();const myApps=S.apps.filter(a=>a.ownerId===my.id);
   return `<h1>${t('myappsTitle')}</h1><div class="sub">${t('myappsSub')}</div>
@@ -799,9 +805,14 @@ function myAppsView(){
       <div class="muted" style="word-break:break-all">🔗 ${esc(a.link)}</div></div></div>
       <div class="row">
         ${a.status==='draft'?`<button class="btn small" onclick="publishApp('${a.id}')">${t('publish')}</button>`:`<button class="btn small sec" onclick="openInvite('${a.id}')">${t('shareBtn')}</button>`}
+        ${a.status!=='draft'?(selfTestingApp(a.id)?`<span class="badge green">${t('selfTesting')}</span>`:`<button class="btn small sec" onclick="selfTest('${a.id}')" title="${t('selfTestInfo')}">${t('selfTestBtn')}</button>`):''}
         <button class="btn small sec" onclick="deleteApp('${a.id}')">${t('del')}</button>
       </div>
     </div>`).join(''):'<div class="card muted">'+t('noGames')+'</div>'}`;
+}
+async function selfTest(appId){ // the developer joins their own game as a tester (once) — counts toward the 14
+  if(selfTestingApp(appId)){toast(t('selfTesting'));return;}
+  await acceptChallenge(appId); // backend allows self-accept; dup check enforces "only once"
 }
 function copyInvite(appId){
   const link=SITE+'/#join='+appId;
