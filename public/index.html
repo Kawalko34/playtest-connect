@@ -202,7 +202,10 @@ en:{
   chatBtn:'💬 Chat',chatWith:'Chat with',chatTitle:'💬 Chat — {a}',chatPh:'Write a message…',chatSend:'Send',chatEmpty:'No messages yet. Say hi 👋',chatYou:'You',
   waitingAdd:'⏳ waiting to be added in Play Console',
   selfTestBtn:'🧪 Test it myself (once)',selfTesting:'🧪 you are self-testing this',youLabel:'(you)',
-  selfTestInfo:'Your own account counts as one tester (Google allows this). You can self-test each of your games once — it does NOT count toward the one-for-one rule.',
+  selfTestInfo:'Your own account counts as one tester (Google allows this). You can self-test each of your games once.',
+  openOnPhone:'📱 Open on my phone',openOnPhoneCap:'Scan with your Android phone to open Play Test there',
+  installHelp:'📲 How to install',installHelpTitle:'Install “{a}” on your Android phone',
+  installScanCap:'Scan this with your Android phone to open the game in Google Play',
   addTitle:'Add a game',gameTitle:'Game title',gameTitlePh:'e.g. Neon Runner',
   gameDesc:'Short description (what to test?)',gameDescPh:'e.g. 2D platformer — check levels 1–5, the shop and ads',
   optinLink:'Opt-in link from Google Play Console',
@@ -364,7 +367,10 @@ pl:{
   chatBtn:'💬 Czat',chatWith:'Czat z',chatTitle:'💬 Czat — {a}',chatPh:'Napisz wiadomość…',chatSend:'Wyślij',chatEmpty:'Brak wiadomości. Przywitaj się 👋',chatYou:'Ty',
   waitingAdd:'⏳ czeka na dodanie w Play Console',
   selfTestBtn:'🧪 Testuj sam (raz)',selfTesting:'🧪 sam testujesz tę grę',youLabel:'(Ty)',
-  selfTestInfo:'Twoje własne konto liczy się jako jeden tester (Google na to pozwala). Każdą swoją grę możesz przetestować sam raz — to NIE liczy się do zasady „jeden za jeden".',
+  selfTestInfo:'Twoje własne konto liczy się jako jeden tester (Google na to pozwala). Każdą swoją grę możesz przetestować sam raz.',
+  openOnPhone:'📱 Otwórz na telefonie',openOnPhoneCap:'Zeskanuj telefonem z Androidem, aby otworzyć tam Play Test',
+  installHelp:'📲 Jak zainstalować',installHelpTitle:'Zainstaluj „{a}" na telefonie Android',
+  installScanCap:'Zeskanuj to telefonem z Androidem, aby otworzyć grę w Google Play',
   addTitle:'Dodaj grę',gameTitle:'Tytuł gry',gameTitlePh:'np. Neon Runner',
   gameDesc:'Krótki opis (co testować?)',gameDescPh:'np. platformówka 2D — sprawdź poziomy 1–5, sklep i reklamy',
   optinLink:'Link opt-in z Google Play Console',
@@ -639,7 +645,7 @@ function render(){
       <div class="logo">▶ Play <span>Test</span></div>
       ${VIEW_KEYS.filter(k=>k!=='admin'||isMaster()).map(k=>{const lbl=t('nav_'+k);return `<button class="navbtn ${view===k?'active':''}" onclick="nav('${k}')"><span>${lbl.split(' ')[0]}</span><span class="lbl">${lbl.split(' ').slice(1).join(' ')}</span></button>`;}).join('')}
       ${langSwitcher()}
-      <div class="bottom">${t('signedAs')}: <b>${esc(nick)}</b><br>${t('cloudMode')}</div>
+      <div class="bottom"><button class="btn sec small" style="width:100%;margin-bottom:8px" onclick="openAppQr()">${t('openOnPhone')}</button>${t('signedAs')}: <b>${esc(nick)}</b><br>${t('cloudMode')}</div>
     </div>
     <div id="main">${({dashboard:dashboardView,myapps:myAppsView,exchange:exchangeView,mytests:myTestsView,reputation:reputationView,help:helpView,admin:adminView,settings:settingsView})[view]()}</div>
   </div>`;
@@ -843,6 +849,18 @@ function showQrApp(appId){ // id-based: titles with quotes can't break the oncli
   const a=appById(appId);if(!a)return;
   showQr(a.title,a.link,t('qrOptin'));
 }
+/* one-window install helper for a game: QR of the opt-in link + install button + simple steps */
+function installHelper(appId){
+  const a=appById(appId);if(!a)return;
+  modal(`<h2 style="margin-top:0">${t('installHelpTitle',{a:esc(a.title)})}</h2>
+  <div style="text-align:center;margin:12px 0">${qrBlock(a.link)}<div class="muted" style="margin-top:6px">${t('installScanCap')}</div></div>
+  <a class="btn" style="display:block;text-align:center;text-decoration:none;margin:10px 0" href="${esc(a.link)}" target="_blank" rel="noopener">${t('openPlay')}</a>
+  <ol style="margin:12px 0 12px 20px;line-height:1.8;font-size:14px">${t('steps')}</ol>
+  <div class="alert amber">${t('warn14')}</div>
+  <button class="btn sec" style="width:100%" onclick="closeModal()">OK</button>`);
+}
+/* QR to move Play Test itself onto an Android phone */
+function openAppQr(){ showQr('Play Test', SITE, t('openOnPhoneCap')); }
 function showQr(title,link,caption){
   modal(`<h2 style="margin-top:0">${esc(title)}</h2>
   <div style="text-align:center;margin:14px 0">${qrBlock(link)}<div class="muted" style="margin-top:8px">${caption}</div></div>
@@ -943,7 +961,7 @@ function myTestsView(){
     ${m.started&&m.status==='active'&&checkedToday(m)?`<span class="badge green">${t('doneToday')}</span>`:''}
     <button class="btn sec" onclick="openChat('${m.id}')">${t('chatBtn')}${msgsFor(m.id).length?' ('+msgsFor(m.id).length+')':''}</button>
     </div></div>
-    ${!m.started?`<a class="btn sec" style="display:inline-block;text-decoration:none;margin-top:8px" href="${esc(a.link)}" target="_blank" rel="noopener">${t('openPlay')}</a>`:''}
+    ${!m.started?`<div style="margin-top:8px"><button class="btn" onclick="installHelper('${a.id}')">${t('installHelp')}</button></div>`:''}
     ${m.started?`<div class="progress"><div style="width:${Math.min(100,s/REQUIRED_DAYS*100)}%"></div></div>
     <div class="muted">${t('optinLinkLbl')}: <span style="word-break:break-all">${esc(a.link)}</span> <button class="btn small sec" onclick="showQrApp('${a.id}')">📱 QR</button></div>
     ${s>=7&&!m.surveys.d7&&m.status==='active'?`<div class="alert amber" style="margin-top:10px">${t('d7due',{id:m.id})}</div>`:''}
@@ -1145,7 +1163,8 @@ function settingsView(){
   <div class="card"><b>${t('langTitle')}</b><div style="height:8px"></div>${langSwitcher()}</div>
   <div class="card"><b>${t('installTitle')}</b>
   <p class="muted" style="margin:8px 0 14px">${t('installInfo')}</p>
-  ${deferredInstall?`<button class="btn" onclick="doInstall()">${t('installBtn')}</button>`:`<div class="muted">${t('installHint')}</div>`}</div>
+  ${deferredInstall?`<button class="btn" onclick="doInstall()">${t('installBtn')}</button>`:`<div class="muted">${t('installHint')}</div>`}
+  <div style="height:10px"></div><button class="btn sec" onclick="openAppQr()">${t('openOnPhone')}</button></div>
   <div class="card"><b>${t('dbTitle')}</b>
   <p class="muted" style="margin:8px 0 14px">${t('dbInfo')}</p>
   <button class="btn" onclick="exportJSON()">${t('exportBtn')}</button></div>
