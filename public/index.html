@@ -129,8 +129,8 @@ const API_BASE=(location.hostname.endsWith('netlify.app')||location.port==='8888
    Fill both constants to switch the app off the Netlify function entirely. */
 const SUPA_URL='https://lhvmewgiuaghixwemcie.supabase.co';
 const SUPA_KEY='sb_publishable_Va3HyNBeF8uUz1P8fRcTqg_G8Lf4imI';
-const RPC_MAP={state:'pt_state',register:'pt_register',addApp:'pt_add_app',publishApp:'pt_publish_app',deleteApp:'pt_delete_app',accept:'pt_accept',start:'pt_start',checkin:'pt_checkin',survey:'pt_survey',screenshot:'pt_shot_get'};
-const ARG_MAP={nick:'p_nick',phone:'p_phone',google:'p_google',idToken:'p_id_token',picture:'p_picture',title:'p_title',desc:'p_desc',link:'p_link',appId:'p_app_id',matchId:'p_match_id',note:'p_note',screenshot:'p_shot',device:'p_device',localDate:'p_local',which:'p_which',q1:'p_q1',q2:'p_q2',q3:'p_q3'};
+const RPC_MAP={state:'pt_state',register:'pt_register',addApp:'pt_add_app',publishApp:'pt_publish_app',deleteApp:'pt_delete_app',accept:'pt_accept',start:'pt_start',checkin:'pt_checkin',survey:'pt_survey',screenshot:'pt_shot_get',sendMsg:'pt_send_msg'};
+const ARG_MAP={nick:'p_nick',phone:'p_phone',google:'p_google',idToken:'p_id_token',picture:'p_picture',title:'p_title',desc:'p_desc',link:'p_link',appId:'p_app_id',matchId:'p_match_id',note:'p_note',screenshot:'p_shot',device:'p_device',localDate:'p_local',which:'p_which',q1:'p_q1',q2:'p_q2',q3:'p_q3',body:'p_body'};
 
 /* ---------- I18N — English default, Polish secondary ---------- */
 const T={
@@ -190,6 +190,17 @@ en:{
   pathT:'What would you like to do?',
   pathTest:'🎮 Test games',pathTestD:'Join someone’s test in 2 minutes — earn points and Trust.',
   pathList:'🚀 Get testers for my game',pathListD:'Step 1: test one game for someone (one-for-one). Step 2: add your game.',
+  copyEmails:'📋 Copy tester e-mails',emailsCopied:'Tester e-mails copied — paste them into your tester list in Play Console.',noEmails:'No testers yet.',
+  addConsoleHint:'👉 Copy these e-mails and add them to your closed-test tester list in Google Play Console — otherwise testers cannot download your game.',
+  genGoogle:'📝 Answer for Google',
+  genTitle:'Ready-to-paste answers for Google Play Console',
+  genIntro:'Google asks how you recruited testers and what feedback you got. Copy the text below straight into Play Console.',
+  genCopyBtn:'📋 Copy everything',genCopied:'Copied — paste it into Play Console.',
+  genRecruit:'How did you find your testers?',
+  genRecruitTxt:'I recruited real testers through Play Test (playtest-connect.netlify.app), a peer-to-peer closed-testing exchange. Each tester installed the app on a physical Android device and used it daily for 14 days.',
+  genFeedback:'Feedback received & changes made:',genNoFeedback:'(No survey feedback yet — testers fill surveys on day 7 and 14.)',
+  chatBtn:'💬 Chat',chatWith:'Chat with',chatTitle:'💬 Chat — {a}',chatPh:'Write a message…',chatSend:'Send',chatEmpty:'No messages yet. Say hi 👋',chatYou:'You',
+  waitingAdd:'⏳ waiting to be added in Play Console',
   addTitle:'Add a game',gameTitle:'Game title',gameTitlePh:'e.g. Neon Runner',
   gameDesc:'Short description (what to test?)',gameDescPh:'e.g. 2D platformer — check levels 1–5, the shop and ads',
   optinLink:'Opt-in link from Google Play Console',
@@ -339,6 +350,17 @@ pl:{
   pathT:'Co chcesz zrobić?',
   pathTest:'🎮 Testuję gry',pathTestD:'Dołącz do czyjegoś testu w 2 minuty — zbieraj punkty i Trust.',
   pathList:'🚀 Szukam testerów do mojej gry',pathListD:'Krok 1: przetestuj jedną grę dla kogoś (jeden za jeden). Krok 2: dodaj swoją grę.',
+  copyEmails:'📋 Kopiuj e-maile testerów',emailsCopied:'E-maile skopiowane — wklej je do listy testerów w Play Console.',noEmails:'Brak testerów.',
+  addConsoleHint:'👉 Skopiuj te e-maile i dodaj je do listy testerów testu zamkniętego w Google Play Console — inaczej testerzy nie pobiorą Twojej gry.',
+  genGoogle:'📝 Odpowiedź dla Google',
+  genTitle:'Gotowe odpowiedzi do wklejenia w Google Play Console',
+  genIntro:'Google pyta, jak zrekrutowałeś testerów i jaki feedback otrzymałeś. Skopiuj poniższy tekst prosto do Play Console.',
+  genCopyBtn:'📋 Kopiuj całość',genCopied:'Skopiowano — wklej do Play Console.',
+  genRecruit:'Jak znalazłeś testerów?',
+  genRecruitTxt:'Zrekrutowałem prawdziwych testerów przez Play Test (playtest-connect.netlify.app) — platformę wzajemnej wymiany testów zamkniętych. Każdy tester zainstalował aplikację na fizycznym urządzeniu z Androidem i używał jej codziennie przez 14 dni.',
+  genFeedback:'Otrzymany feedback i wprowadzone zmiany:',genNoFeedback:'(Brak feedbacku z ankiet — testerzy wypełniają ankiety w dniu 7 i 14.)',
+  chatBtn:'💬 Czat',chatWith:'Czat z',chatTitle:'💬 Czat — {a}',chatPh:'Napisz wiadomość…',chatSend:'Wyślij',chatEmpty:'Brak wiadomości. Przywitaj się 👋',chatYou:'Ty',
+  waitingAdd:'⏳ czeka na dodanie w Play Console',
   addTitle:'Dodaj grę',gameTitle:'Tytuł gry',gameTitlePh:'np. Neon Runner',
   gameDesc:'Krótki opis (co testować?)',gameDescPh:'np. platformówka 2D — sprawdź poziomy 1–5, sklep i reklamy',
   optinLink:'Link opt-in z Google Play Console',
@@ -437,8 +459,9 @@ pl:{
 let SESSION={};try{SESSION=JSON.parse(localStorage.getItem('ptc_session')||'{}');}catch(e){}
 function saveSession(){localStorage.setItem('ptc_session',JSON.stringify(SESSION));}
 let LANG=SESSION.lang||'en';
-let S={users:[],apps:[],matches:[]};
+let S={users:[],apps:[],matches:[],messages:[]};
 let deferredInstall=null;
+let detectedPhone=''; // auto-filled Android model, if the browser exposes it
 
 function t(k,vars){let s=(T[LANG][k]!==undefined?T[LANG][k]:T.en[k])||k;if(vars)Object.entries(vars).forEach(([kk,v])=>{s=s.split('{'+kk+'}').join(v);});return s;}
 function setLang(l){LANG=l;SESSION.lang=l;saveSession();document.documentElement.lang=l;render();}
@@ -516,7 +539,16 @@ async function deviceCheck(){
     }catch(e){}
   }
   if(version===null&&isAndroid){const m2=ua.match(/Android (\d+)/);if(m2)version=parseInt(m2[1]);}
-  return {isAndroid,version,record:{android:isAndroid,version:version}};
+  // best-effort phone model auto-detect (Chrome Android exposes it via UA-CH 'model')
+  if(!detectedPhone&&navigator.userAgentData&&navigator.userAgentData.getHighEntropyValues){
+    try{const h=await navigator.userAgentData.getHighEntropyValues(['model']);if(h.model)detectedPhone=h.model;}catch(e){}
+  }
+  return {isAndroid,version,record:{android:isAndroid,version:version,model:detectedPhone||null}};
+}
+async function prefillPhone(){ // fill the phone input if we detected the model
+  await deviceCheck();
+  if(!detectedPhone)return;
+  ['regPhone','gPhone'].forEach(id=>{const el=document.getElementById(id);if(el&&!el.value)el.value=detectedPhone;});
 }
 
 /* ---------- TOAST / MODAL ---------- */
@@ -567,6 +599,7 @@ async function onGoogleCredential(resp){
   <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-weight:400;color:var(--text)"><input type="checkbox" id="gTerms" style="width:auto;margin-top:3px"> <span>${t('declTerms')}</span></label>
   <div class="muted" style="margin-top:10px">${t('termsRead')}</div>
   <button class="btn" style="width:100%;margin-top:18px" onclick="finishGoogleReg('${esc(email)}','${esc(p.picture||'')}')">${t('createAcc')}</button>`);
+  prefillPhone();
 }
 async function finishGoogleReg(email,picture){
   const nick=document.getElementById('gNick').value.trim();
@@ -594,7 +627,7 @@ function langSwitcher(){
 
 function render(){
   const root=document.getElementById('root');
-  if(!SESSION.meId||!me()){root.innerHTML=registerView();maybeInitGoogle();return;}
+  if(!SESSION.meId||!me()){root.innerHTML=registerView();maybeInitGoogle();prefillPhone();return;}
   const nick=me().nick;
   root.innerHTML=`
   <div id="layout">
@@ -730,16 +763,20 @@ function deviceBadge(m){
   return ` <span class="badge gray">💻</span>`;
 }
 function appProgressCard(a){
-  const ms=S.matches.filter(m=>m.appId===a.id&&m.status==='active'&&m.started);
-  const qualified=ms.filter(m=>streak(m)>=REQUIRED_DAYS).length;
-  const activeCount=ms.length;
+  const all=S.matches.filter(m=>m.appId===a.id&&m.status==='active'); // includes accepted-not-started (waiting to be added to console)
+  const started=all.filter(m=>m.started);
+  const qualified=started.filter(m=>streak(m)>=REQUIRED_DAYS).length;
+  const activeCount=started.length;
   return `<div class="card">
     <div class="spread"><div class="row"><div class="appicon">🎮</div><div><b>${esc(a.title)}</b> <span class="badge ${a.status==='searching'?'blue':'green'}">${a.status==='searching'?t('searching'):t('inTest')}</span></div></div>
     <div><span class="stat">${activeCount}<small>${t('testers',{n:TARGET_TESTERS})}</small></span></div></div>
     <div class="progress"><div style="width:${Math.min(100,activeCount/TARGET_TESTERS*100)}%"></div></div>
     <div class="muted">${t('recommend',{n:TARGET_TESTERS,min:GOOGLE_MIN_TESTERS})}<b style="color:var(--accent)">${qualified}</b></div>
-    ${ms.map(m=>{const tu=userById(m.testerId);const s=streak(m);const gap=lastCheckin(m)?daysDiff(lastCheckin(m),todayISO()):0;
-      return `<div style="margin-top:10px"><div class="spread"><span>${esc(tu?tu.nick:'?')} <span class="muted">(${t('trust')} ${trust(tu)})</span>${deviceBadge(m)}</span><span class="${s>=REQUIRED_DAYS?'badge green':gap>=2?'badge red':'badge gray'}">${s>=REQUIRED_DAYS?t('full14'):gap>=2?t('streakZero'):t('dayXof',{d:s,max:REQUIRED_DAYS})}</span></div>
+    ${all.length?`<div class="alert amber" style="margin-top:12px;font-size:12.5px">${t('addConsoleHint')}</div>
+    <div class="row" style="margin:8px 0"><button class="btn small" onclick="copyEmails('${a.id}')">${t('copyEmails')}</button><button class="btn small sec" onclick="openGoogleAnswer('${a.id}')">${t('genGoogle')}</button></div>`:''}
+    ${all.map(m=>{const tu=userById(m.testerId);const s=streak(m);const gap=lastCheckin(m)?daysDiff(lastCheckin(m),todayISO()):0;const unread=msgsFor(m.id).length;
+      const badge=!m.started?'<span class="badge amber">'+t('waitingAdd')+'</span>':s>=REQUIRED_DAYS?'<span class="badge green">'+t('full14')+'</span>':gap>=2?'<span class="badge red">'+t('streakZero')+'</span>':'<span class="badge gray">'+t('dayXof',{d:s,max:REQUIRED_DAYS})+'</span>';
+      return `<div style="margin-top:10px"><div class="spread"><span>${esc(tu?tu.nick:'?')} <span class="muted">(${t('trust')} ${trust(tu)})</span>${deviceBadge(m)}</span><span class="row" style="gap:6px"><button class="btn small sec" onclick="openChat('${m.id}')">${t('chatBtn')}${unread?' ('+unread+')':''}</button>${badge}</span></div>
       ${tu&&(tu.email||tu.phone)?`<div class="muted" style="font-size:12px">${tu.email?'✉ '+esc(tu.email):''}${tu.email&&tu.phone?' · ':''}${tu.phone?'📱 '+esc(tu.phone):''}</div>`:''}
       <div class="progress"><div style="width:${Math.min(100,s/REQUIRED_DAYS*100)}%;${gap>=2?'background:var(--danger)':''}"></div></div></div>`;}).join('')}
   </div>`;
@@ -837,7 +874,10 @@ async function deleteApp(id){
 /* ============ TEST EXCHANGE ============ */
 function exchangeView(){
   const my=me();
-  const avail=S.apps.filter(a=>a.ownerId!==my.id&&(a.status==='searching'||a.status==='testing')&&!S.matches.some(m=>m.appId===a.id&&m.testerId===my.id));
+  const cnt=a=>S.matches.filter(m=>m.appId===a.id&&m.status==='active').length;
+  const avail=S.apps.filter(a=>a.ownerId!==my.id&&(a.status==='searching'||a.status==='testing')&&!S.matches.some(m=>m.appId===a.id&&m.testerId===my.id))
+    // closest to the 14-tester goal first, so the community finishes games faster (everyone graduates sooner)
+    .sort((x,y)=>cnt(y)-cnt(x));
   return `<h1>${t('exTitle')}</h1><div class="sub">${t('exSub')}</div>
   ${avail.length?avail.map(a=>{const o=userById(a.ownerId);const cnt=S.matches.filter(m=>m.appId===a.id&&m.status==='active').length;
     return `<div class="card spread">
@@ -890,6 +930,7 @@ function myTestsView(){
     ${!m.started&&m.status==='active'?`<button class="btn" onclick="startTest('${m.id}')">${t('startBtn')}</button>`:''}
     ${m.started&&m.status==='active'&&!checkedToday(m)?`<button class="btn" onclick="openCheckin('${m.id}')">${t('checkinBtn')}</button>`:''}
     ${m.started&&m.status==='active'&&checkedToday(m)?`<span class="badge green">${t('doneToday')}</span>`:''}
+    <button class="btn sec" onclick="openChat('${m.id}')">${t('chatBtn')}${msgsFor(m.id).length?' ('+msgsFor(m.id).length+')':''}</button>
     </div></div>
     ${!m.started?`<a class="btn sec" style="display:inline-block;text-decoration:none;margin-top:8px" href="${esc(a.link)}" target="_blank" rel="noopener">${t('openPlay')}</a>`:''}
     ${m.started?`<div class="progress"><div style="width:${Math.min(100,s/REQUIRED_DAYS*100)}%"></div></div>
@@ -1013,6 +1054,53 @@ function adminView(){
     </table></div>
   <div class="alert amber">${t('admPay')}</div>`;
 }
+
+/* ============ CHAT (developer <-> tester) ============ */
+function msgsFor(matchId){return (S.messages||[]).filter(m=>m.matchId===matchId);}
+function openChat(matchId){
+  const m=S.matches.find(x=>x.id===matchId);if(!m)return;
+  const a=appById(m.appId);const other=userById(m.testerId===SESSION.meId?appById(m.appId).ownerId:m.testerId);
+  const msgs=msgsFor(matchId);
+  modal(`<h2 style="margin-top:0">${t('chatTitle',{a:esc(a?a.title:'')})}</h2>
+  <div class="muted" style="margin-bottom:8px">${t('chatWith')} ${esc(other?other.nick:'?')}</div>
+  <div id="chatBox" style="max-height:46vh;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:4px 0">
+  ${msgs.length?msgs.map(x=>{const mine=x.senderId===SESSION.meId;return `<div style="align-self:${mine?'flex-end':'flex-start'};max-width:80%;background:${mine?'var(--accent)':'var(--card2)'};color:${mine?'#06210f':'var(--text)'};padding:8px 12px;border-radius:12px"><div style="font-size:11px;opacity:.7;margin-bottom:2px">${mine?t('chatYou'):esc(other?other.nick:'?')}</div>${esc(x.body)}</div>`;}).join(''):`<div class="muted" style="text-align:center;padding:20px">${t('chatEmpty')}</div>`}
+  </div>
+  <div class="row" style="margin-top:12px"><input id="chatIn" placeholder="${t('chatPh')}" onkeydown="if(event.key==='Enter')doSendMsg('${matchId}')" style="flex:1"><button class="btn" onclick="doSendMsg('${matchId}')">${t('chatSend')}</button></div>`);
+  const box=document.getElementById('chatBox');if(box)box.scrollTop=box.scrollHeight;
+}
+async function doSendMsg(matchId){
+  const inp=document.getElementById('chatIn');const body=inp.value.trim();if(!body)return;
+  inp.value='';
+  const d=await api('sendMsg',{matchId,body});
+  if(d.ok)openChat(matchId); else toast(t('netErr'));
+}
+
+/* ============ COPY TESTER E-MAILS (for the Play Console tester list) ============ */
+function testerEmailsFor(appId){
+  const ids=S.matches.filter(m=>m.appId===appId&&m.status!=='abandoned').map(m=>m.testerId);
+  return [...new Set(ids)].map(id=>userById(id)).filter(u=>u&&u.email).map(u=>u.email);
+}
+function copyEmails(appId){
+  const emails=testerEmailsFor(appId);
+  if(!emails.length){toast(t('noEmails'));return;}
+  const text=emails.join(', ');
+  (navigator.clipboard?navigator.clipboard.writeText(text):Promise.reject()).then(()=>toast(t('emailsCopied'))).catch(()=>prompt('E-mails:',text));
+}
+
+/* ============ GOOGLE ANSWER GENERATOR (paste into Play Console) ============ */
+function openGoogleAnswer(appId){
+  const a=appById(appId);
+  const ms=S.matches.filter(m=>m.appId===appId&&m.started);
+  const fb=[];
+  ms.forEach(m=>{const tu=userById(m.testerId);['d7','d14'].forEach(w=>{const s=m.surveys&&m.surveys[w];if(s&&(s.q1||s.q2||s.q3))fb.push(`• ${tu?tu.nick:'Tester'} (${w==='d7'?'day 7':'day 14'}): ${[s.q1,s.q2,s.q3].filter(Boolean).join(' | ')}`);});});
+  const full=`${t('genRecruit')}\n${t('genRecruitTxt')}\n\n${t('genFeedback')}\n${fb.length?fb.join('\n'):t('genNoFeedback')}`;
+  modal(`<h2 style="margin-top:0">${t('genTitle')}</h2>
+  <p class="muted" style="margin:8px 0">${t('genIntro')}</p>
+  <textarea id="genTxt" rows="12" style="font-size:13px">${esc(full)}</textarea>
+  <div class="row" style="margin-top:12px"><button class="btn" onclick="copyGen()">${t('genCopyBtn')}</button><button class="btn sec" onclick="closeModal()">${t('cancel')}</button></div>`);
+}
+function copyGen(){const el=document.getElementById('genTxt');el.select();const v=el.value;(navigator.clipboard?navigator.clipboard.writeText(v):Promise.reject()).then(()=>toast(t('genCopied'))).catch(()=>{try{document.execCommand('copy');toast(t('genCopied'));}catch(e){}});}
 
 /* ============ HELP & GUIDES (for people with zero experience) ============ */
 function helpView(){
